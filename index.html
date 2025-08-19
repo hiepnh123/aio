@@ -1,0 +1,36 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Tin Giáo dục Đại học</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+    h1 { color: #2a5db0; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 10px; }
+    a { text-decoration: none; color: #1a73e8; }
+  </style>
+</head>
+<body>
+  <h1>Tin Giáo dục Đại học</h1>
+  <ul id="news"></ul>
+
+  <script>
+    fetch("data.json")
+      .then(res => res.json())
+      .then(data => {
+        const ul = document.getElementById("news");
+        data.forEach(item => {
+          const li = document.createElement("li");
+          li.innerHTML = `<a href="${item.link}" target="_blank">${item.title}</a>`;
+          ul.appendChild(li);
+        });
+      })
+      .catch(err => {
+        document.getElementById("news").innerHTML = "<li>Lỗi khi tải dữ liệu.</li>";
+        console.error("Fetch error:", err);
+      });
+  </script>
+</body>
+</html>
