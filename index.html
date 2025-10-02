@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ứng dụng Quản Lý Công Việc Chi Tiết</title>
+    <title>Ứng dụng Quản Lý Công Việc (LocalStorage)</title>
     <!-- Tải Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -65,7 +65,7 @@
             Quản Lý Công Việc Chi Tiết
         </h1>
         <p class="text-xs text-gray-500 mb-6 text-center">
-            <span class="font-semibold">ID Người Dùng:</span> <span id="user-id-display">Đang tải...</span>
+            <span class="font-semibold">Lưu trữ:</span> <span id="storage-status-display" class="text-green-600">Local Browser Storage</span>
         </p>
 
         <!-- --- TAB NAVIGATION --- -->
@@ -149,15 +149,15 @@
 
                 <!-- Nút Thêm -->
                 <button type="submit"
-                        class="w-full bg-primary hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition duration-200 disabled:opacity-50 mt-4"
-                        id="add-task-button" disabled>
+                        class="w-full bg-primary hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition duration-200 mt-4"
+                        id="add-task-button">
                     Thêm Công Việc
                 </button>
             </form>
 
             <!-- Danh sách Công Việc -->
             <div id="task-list-container">
-                <p id="loading-indicator" class="text-center text-gray-500 py-10">Đang tải công việc...</p>
+                <p id="loading-indicator" class="text-center text-gray-500 py-10 hidden">Đang tải công việc...</p>
                 <ul id="task-list" class="space-y-4">
                     <!-- Công việc sẽ được render tại đây -->
                 </ul>
@@ -227,66 +227,17 @@
 
         <!-- Thông báo lỗi (Ẩn mặc định) -->
         <div id="error-message" class="hidden mt-6 p-4 bg-danger text-white rounded-lg font-semibold shadow-md">
-            Có lỗi xảy ra khi kết nối với Firestore. Vui lòng kiểm tra console.
+            Lỗi khi xử lý dữ liệu LocalStorage. Vui lòng kiểm tra console.
         </div>
     </div>
 
-    <!-- Khối Script Module cho Firebase và Logic Ứng dụng -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, 
-            query, onSnapshot, serverTimestamp, setLogLevel 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- Khối Script cho Logic Ứng dụng -->
+    <script>
         
-        // Bật logging chi tiết cho Firebase
-        setLogLevel('Debug');
-        
-        // --- 1. KHỞI TẠO FIREBASE VÀ AUTHENTICATION ---
+        // --- CẤU HÌNH VÀ BIẾN TOÀN CỤC ---
+        const LOCAL_STORAGE_KEY = 'todoListTasks';
+        let currentTodos = [];
 
-        // --- START: CẤU HÌNH FIREBASE CỦA BẠN (DÀNH CHO GITHUB PAGES) ---
-        // VUI LÒNG DÁN CẤU HÌNH DỰ ÁN FIREBASE CỦA BẠN VÀO ĐÂY ĐỂ ỨNG DỤNG HOẠT ĐỘNG.
-        // ĐỂ TÌM CẤU HÌNH NÀY: Vào Firebase Console > Project Settings > General > SDK setup and configuration.
-        const CUSTOM_FIREBASE_CONFIG = {
-            apiKey: "DÁN_API_KEY_CỦA_BẠN_VÀO_ĐÂY", 
-            authDomain: "DÁN_AUTH_DOMAIN_CỦA_BẠN_VÀO_ĐÂY", 
-            projectId: "DÁN_PROJECT_ID_CỦA_BẠN_VÀO_ĐÂY",
-            // Bạn có thể thêm các trường khác như storageBucket, messagingSenderId, appId nếu cần.
-        };
-        // --- END: CẤU HÌNH FIREBASE CỦA BẠN ---
-        
-        let db;
-        let auth;
-        let userId = null;
-        let todosCollectionRef = null;
-        
-        // Logic ưu tiên: Nếu đang chạy trong Canvas, dùng cấu hình Canvas. Nếu không, dùng cấu hình tùy chỉnh (CUSTOM_FIREBASE_CONFIG).
-        const canvasConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const firebaseConfig = canvasConfig || CUSTOM_FIREBASE_CONFIG;
-        
-        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-
-        // Kiểm tra cấu hình trước khi khởi tạo
-        if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('DÁN_API_KEY_CỦA_BẠN_VÀO_ĐÂY')) {
-            document.addEventListener('DOMContentLoaded', () => {
-                document.getElementById('loading-indicator').textContent = 'LỖI: Vui lòng điền cấu hình Firebase (apiKey, projectId, v.v.) vào mã nguồn để ứng dụng hoạt động trên GitHub Pages.';
-                document.getElementById('add-task-button').disabled = true;
-                document.getElementById('user-id-display').textContent = 'Lỗi cấu hình';
-                document.getElementById('error-message').textContent = 'Ứng dụng chưa được cấu hình Firebase đúng cách.';
-                document.getElementById('error-message').classList.remove('hidden');
-            });
-            throw new Error("Missing Firebase Configuration");
-        }
-
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        
         // Lấy các phần tử DOM
         const taskList = document.getElementById('task-list');
         const titleInput = document.getElementById('title-input');
@@ -298,7 +249,6 @@
         const addTaskForm = document.getElementById('add-task-form');
         const addTaskButton = document.getElementById('add-task-button');
         const loadingIndicator = document.getElementById('loading-indicator');
-        const userIdDisplay = document.getElementById('user-id-display');
         const errorMessage = document.getElementById('error-message');
         
         // DOM cho Tabs
@@ -320,7 +270,48 @@
         const statsMedium = document.getElementById('stats-medium');
         const statsLow = document.getElementById('stats-low');
         
-        let currentTodos = [];
+        // --- HÀM XỬ LÝ DỮ LIỆU LOCALSTORAGE ---
+
+        /**
+         * Lấy dữ liệu công việc từ LocalStorage
+         */
+        function loadTasks() {
+            try {
+                const storedTasks = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return storedTasks ? JSON.parse(storedTasks) : [];
+            } catch (error) {
+                console.error("Lỗi khi tải dữ liệu từ LocalStorage:", error);
+                displayError("Không thể tải dữ liệu. LocalStorage có thể bị lỗi.");
+                return [];
+            }
+        }
+        
+        /**
+         * Lưu dữ liệu công việc vào LocalStorage
+         */
+        function saveTasks() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentTodos));
+                // Sau khi lưu, gọi lại hàm render để cập nhật toàn bộ giao diện
+                updateAppUI(); 
+            } catch (error) {
+                console.error("Lỗi khi lưu dữ liệu vào LocalStorage:", error);
+                displayError("Không thể lưu dữ liệu. LocalStorage có thể bị đầy.");
+            }
+        }
+        
+        /**
+         * Cập nhật toàn bộ giao diện (danh sách, thống kê, gantt)
+         */
+        function updateAppUI() {
+            renderTasks(currentTodos);
+            const activeTab = document.querySelector('.tab-btn.text-primary').dataset.tab;
+            if (activeTab === 'stats') {
+                calculateAndRenderStats(currentTodos);
+            } else if (activeTab === 'gantt') {
+                renderGanttChart(currentTodos);
+            }
+        }
 
         // --- HÀM XỬ LÝ GIAO DIỆN CHUNG ---
         
@@ -469,53 +460,11 @@
             loadingIndicator.classList.add('hidden');
         }
 
-        // Đăng nhập người dùng (Ưu tiên dùng token có sẵn từ Canvas, nếu không thì dùng Anonymous)
-        async function authenticateAndSetup() {
-            try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    // Đây là phương thức xác thực khi chạy độc lập
-                    await signInAnonymously(auth); 
-                }
-            } catch (error) {
-                displayError(`Lỗi xác thực: ${error.message}. Kiểm tra Cấu hình Firebase và quy tắc bảo mật.`);
-            }
-        }
 
-        // Lắng nghe trạng thái xác thực
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                userId = user.uid;
-                userIdDisplay.textContent = userId;
-                // KÍCH HOẠT NÚT KHI ĐÃ XÁC THỰC
-                addTaskButton.disabled = false; 
-                
-                // Đường dẫn collection riêng tư cho người dùng
-                const collectionPath = `/artifacts/${appId}/users/${userId}/todos`;
-                todosCollectionRef = collection(db, collectionPath);
-                
-                console.log(`Đã xác thực. UserId: ${userId}.`);
-                
-                // Bắt đầu lắng nghe dữ liệu
-                setupRealtimeListener();
-
-            } else {
-                userIdDisplay.textContent = 'Chưa xác thực';
-                loadingIndicator.textContent = 'Đang chờ xác thực...';
-                addTaskButton.disabled = true;
-                if (!userId) {
-                    // Nếu chưa xác thực, thử gọi lại hàm xác thực
-                    authenticateAndSetup(); 
-                }
-            }
-        });
-
-
-        // --- 2. HÀM THAO TÁC VỚI FIRESTORE & RENDER GIAO DIỆN ---
+        // --- 2. HÀM THAO TÁC VỚI LOCALSTORAGE & RENDER GIAO DIỆN ---
 
         /**
-         * Render danh sách công việc từ dữ liệu Firestore
+         * Render danh sách công việc từ dữ liệu hiện tại
          */
         function renderTasks(todos) {
             taskList.innerHTML = '';
@@ -527,11 +476,8 @@
             }
 
             // Sắp xếp dữ liệu theo thời gian tạo (từ mới nhất đến cũ nhất)
-            todos.sort((a, b) => {
-                const dateA = a.createdAt ? a.createdAt.toDate().getTime() : 0;
-                const dateB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
-                return dateB - dateA;
-            });
+            // Trong LocalStorage, chúng ta dùng `createdAt` là timestamp (số)
+            todos.sort((a, b) => b.createdAt - a.createdAt);
 
             todos.forEach(task => {
                 const isCompleted = task.status === 'Completed';
@@ -771,7 +717,7 @@
             const stats = {
                 total: todos.length,
                 completed: 0,
-                pending: 0, // bao gồm 'In Progress' và 'Pending'
+                pending: 0, 
                 overdue: 0,
                 priority: { High: 0, Medium: 0, Low: 0 }
             };
@@ -795,7 +741,7 @@
             // Hiển thị ra DOM
             statsTotal.textContent = stats.total;
             statsCompleted.textContent = stats.completed;
-            statsActive.textContent = stats.pending; // Đang làm & Chờ
+            statsActive.textContent = stats.pending; 
             statsOverdue.textContent = stats.overdue;
             statsHigh.textContent = stats.priority.High;
             statsMedium.textContent = stats.priority.Medium;
@@ -809,13 +755,13 @@
             // Event cho nút Hoàn thành/Đang làm
             document.querySelectorAll('.toggle-btn').forEach(button => {
                 button.onclick = (e) => {
-                    e.stopPropagation(); // Ngăn chặn sự kiện click lan truyền
+                    e.stopPropagation(); 
                     const id = button.dataset.id;
                     const currentStatus = button.dataset.currentStatus;
                     
                     let newStatus;
                     if (currentStatus === 'Completed') {
-                        newStatus = 'In Progress'; 
+                        newStatus = 'Pending'; // Chuyển sang Pending khi bỏ hoàn thành
                     } else {
                         newStatus = 'Completed';
                     }
@@ -826,7 +772,7 @@
             // Event cho nút Xóa
             document.querySelectorAll('.delete-btn').forEach(button => {
                 button.onclick = (e) => {
-                    e.stopPropagation(); // Ngăn chặn sự kiện click lan truyền
+                    e.stopPropagation(); 
                     const id = button.dataset.id;
                     deleteTask(id);
                 };
@@ -835,7 +781,7 @@
             // Event cho nút Toggle Details
             document.querySelectorAll('.toggle-details-btn').forEach(button => {
                 button.onclick = (e) => {
-                    e.stopPropagation(); // Ngăn chặn sự kiện click lan truyền
+                    e.stopPropagation(); 
                     const id = button.dataset.id;
                     const detailsElement = document.getElementById(`details-${id}`);
                     
@@ -847,95 +793,50 @@
 
 
         /**
-         * Thiết lập lắng nghe theo thời gian thực (Realtime Listener)
+         * Thêm công việc mới vào mảng và lưu vào LocalStorage
          */
-        function setupRealtimeListener() {
-            if (!todosCollectionRef) return;
+        function addTask(title, description, priority, startDate, deadlineDate) {
+            const newTask = {
+                id: Date.now(), // Sử dụng timestamp làm ID duy nhất
+                title: title.trim(),
+                description: description.trim() || null, 
+                status: 'Pending', 
+                priority: priority,
+                startDate: startDate || null,
+                deadlineDate: deadlineDate || null,
+                createdAt: Date.now() // Timestamp tạo
+            };
 
-            const q = query(todosCollectionRef);
-
-            onSnapshot(q, (snapshot) => {
-                const todos = [];
-                snapshot.forEach(doc => {
-                    todos.push({ id: doc.id, ...doc.data() });
-                });
-                
-                currentTodos = todos; // Lưu trữ dữ liệu hiện tại
-                
-                renderTasks(todos);
-                // Chỉ gọi render stats và gantt nếu đang ở tab đó để tránh lãng phí tài nguyên
-                const activeTab = document.querySelector('.tab-btn.text-primary').dataset.tab;
-                if (activeTab === 'stats') {
-                    calculateAndRenderStats(todos);
-                } else if (activeTab === 'gantt') {
-                    renderGanttChart(todos);
-                }
-
-            }, (error) => {
-                displayError(error.message);
-            });
-        }
-
-        /**
-         * Thêm công việc mới vào Firestore
-         */
-        async function addTask(title, description, priority, startDate, deadlineDate) {
-            if (!todosCollectionRef || !title.trim()) return;
-
-            try {
-                await addDoc(todosCollectionRef, {
-                    title: title.trim(),
-                    description: description.trim() || null, 
-                    status: 'Pending', 
-                    priority: priority,
-                    startDate: startDate || null,
-                    deadlineDate: deadlineDate || null,
-                    createdAt: serverTimestamp() 
-                });
-                
-                // Xóa input sau khi thêm thành công và đặt lại
-                titleInput.value = ''; 
-                descriptionInput.value = '';
-                prioritySelect.value = 'Medium';
-                dateStartInput.value = getTodayDateString(); 
-                deadlineModeSelect.value = 'none'; 
-                dateDeadlineInput.value = ''; 
-                dateDeadlineInput.classList.add('hidden'); 
-
-            } catch (error) {
-                displayError(`Không thể thêm công việc: ${error.message}`);
-            }
+            currentTodos.push(newTask);
+            saveTasks();
+            
+            // Xóa input sau khi thêm thành công và đặt lại form
+            titleInput.value = ''; 
+            descriptionInput.value = '';
+            prioritySelect.value = 'Medium';
+            dateStartInput.value = getTodayDateString(); 
+            deadlineModeSelect.value = 'none'; 
+            dateDeadlineInput.value = ''; 
+            dateDeadlineInput.classList.add('hidden'); 
         }
 
         /**
          * Cập nhật trạng thái công việc
          */
-        async function updateTaskStatus(id, newStatus) {
-            if (!todosCollectionRef) return;
-            const taskDocRef = doc(todosCollectionRef, id);
-
-            try {
-                await updateDoc(taskDocRef, {
-                    status: newStatus
-                });
-            } catch (error) {
-                displayError(`Không thể cập nhật trạng thái công việc: ${error.message}`);
+        function updateTaskStatus(id, newStatus) {
+            const taskIndex = currentTodos.findIndex(task => task.id == id);
+            if (taskIndex !== -1) {
+                currentTodos[taskIndex].status = newStatus;
+                saveTasks();
             }
         }
 
         /**
-         * Xóa công việc khỏi Firestore
+         * Xóa công việc khỏi mảng và lưu vào LocalStorage
          */
-        async function deleteTask(id) {
-            if (!todosCollectionRef) return;
-            const taskDocRef = doc(todosCollectionRef, id);
-
-            try {
-                console.log(`Xóa công việc với ID: ${id}`); 
-                await deleteDoc(taskDocRef);
-            } catch (error) {
-                displayError(`Không thể xóa công việc: ${error.message}`);
-            }
+        function deleteTask(id) {
+            currentTodos = currentTodos.filter(task => task.id != id);
+            saveTasks();
         }
 
 
@@ -965,10 +866,12 @@
             }
         });
 
-        // Khởi động quá trình xác thực
-        if (!auth.currentUser) {
-            authenticateAndSetup();
-        }
+        // Khởi tạo ứng dụng khi tải trang
+        (function initApp() {
+            currentTodos = loadTasks();
+            switchTab('manager'); // Đảm bảo tab quản lý được hiển thị đầu tiên
+            updateAppUI(); // Cập nhật lần đầu tiên
+        })();
 
     </script>
 </body>
