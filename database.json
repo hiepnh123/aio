@@ -1,0 +1,14 @@
+[
+  {
+    "keyword": "HTML (HyperText Markup Language)",
+    "content": "Là ngôn ngữ đánh dấu siêu văn bản, được sử dụng để tạo và cấu trúc các thành phần trong trang web hoặc ứng dụng. HTML không phải là ngôn ngữ lập trình."
+  },
+  {
+    "keyword": "CSS (Cascading Style Sheets)",
+    "content": "Là ngôn ngữ được sử dụng để tìm và định dạng lại các phần tử được tạo ra bởi các ngôn ngữ đánh dấu (như HTML). CSS giúp trang web có giao diện đẹp mắt hơn."
+  },
+  {
+    "keyword": "JavaScript",
+    "content": "Là ngôn ngữ lập trình kịch bản dựa trên đối tượng, thường được sử dụng bên phía client để tạo ra các trang web động, tương tác với người dùng."
+  }
+]
