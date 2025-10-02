@@ -244,21 +244,49 @@
         
         // Bật logging chi tiết cho Firebase
         setLogLevel('Debug');
-
+        
         // --- 1. KHỞI TẠO FIREBASE VÀ AUTHENTICATION ---
+
+        // --- START: CẤU HÌNH FIREBASE CỦA BẠN (DÀNH CHO GITHUB PAGES) ---
+        // VUI LÒNG DÁN CẤU HÌNH DỰ ÁN FIREBASE CỦA BẠN VÀO ĐÂY ĐỂ ỨNG DỤNG HOẠT ĐỘNG.
+        // ĐỂ TÌM CẤU HÌNH NÀY: Vào Firebase Console > Project Settings > General > SDK setup and configuration.
+        const CUSTOM_FIREBASE_CONFIG = {
+            apiKey: "DÁN_API_KEY_CỦA_BẠN_VÀO_ĐÂY", 
+            authDomain: "DÁN_AUTH_DOMAIN_CỦA_BẠN_VÀO_ĐÂY", 
+            projectId: "DÁN_PROJECT_ID_CỦA_BẠN_VÀO_ĐÂY",
+            // Bạn có thể thêm các trường khác như storageBucket, messagingSenderId, appId nếu cần.
+        };
+        // --- END: CẤU HÌNH FIREBASE CỦA BẠN ---
+        
         let db;
         let auth;
         let userId = null;
         let todosCollectionRef = null;
         
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        // Logic ưu tiên: Nếu đang chạy trong Canvas, dùng cấu hình Canvas. Nếu không, dùng cấu hình tùy chỉnh (CUSTOM_FIREBASE_CONFIG).
+        const canvasConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const firebaseConfig = canvasConfig || CUSTOM_FIREBASE_CONFIG;
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+
+        // Kiểm tra cấu hình trước khi khởi tạo
+        if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('DÁN_API_KEY_CỦA_BẠN_VÀO_ĐÂY')) {
+            document.addEventListener('DOMContentLoaded', () => {
+                document.getElementById('loading-indicator').textContent = 'LỖI: Vui lòng điền cấu hình Firebase (apiKey, projectId, v.v.) vào mã nguồn để ứng dụng hoạt động trên GitHub Pages.';
+                document.getElementById('add-task-button').disabled = true;
+                document.getElementById('user-id-display').textContent = 'Lỗi cấu hình';
+                document.getElementById('error-message').textContent = 'Ứng dụng chưa được cấu hình Firebase đúng cách.';
+                document.getElementById('error-message').classList.remove('hidden');
+            });
+            throw new Error("Missing Firebase Configuration");
+        }
 
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
-
+        
         // Lấy các phần tử DOM
         const taskList = document.getElementById('task-list');
         const titleInput = document.getElementById('title-input');
@@ -276,12 +304,12 @@
         // DOM cho Tabs
         const tabManagerBtn = document.getElementById('tab-manager-btn');
         const tabStatsBtn = document.getElementById('tab-stats-btn');
-        const tabGanttBtn = document.getElementById('tab-gantt-btn'); // NEW
+        const tabGanttBtn = document.getElementById('tab-gantt-btn'); 
         const taskManagerTab = document.getElementById('task-manager-tab');
         const statisticsTab = document.getElementById('statistics-tab');
-        const ganttTab = document.getElementById('gantt-tab'); // NEW
-        const ganttChartContent = document.getElementById('gantt-chart-content'); // NEW
-        const ganttMessage = document.getElementById('gantt-message'); // NEW
+        const ganttTab = document.getElementById('gantt-tab'); 
+        const ganttChartContent = document.getElementById('gantt-chart-content'); 
+        const ganttMessage = document.getElementById('gantt-message'); 
         
         // DOM cho Stats
         const statsTotal = document.getElementById('stats-total');
@@ -334,7 +362,7 @@
         // Gắn sự kiện chuyển tab
         tabManagerBtn.addEventListener('click', () => switchTab('manager'));
         tabStatsBtn.addEventListener('click', () => switchTab('stats'));
-        tabGanttBtn.addEventListener('click', () => switchTab('gantt')); // NEW
+        tabGanttBtn.addEventListener('click', () => switchTab('gantt')); 
 
 
         // --- LOGIC NGÀY THÁNG VÀ MÀU SẮC ---
@@ -441,16 +469,17 @@
             loadingIndicator.classList.add('hidden');
         }
 
-        // Đăng nhập người dùng (Ưu tiên dùng token có sẵn)
+        // Đăng nhập người dùng (Ưu tiên dùng token có sẵn từ Canvas, nếu không thì dùng Anonymous)
         async function authenticateAndSetup() {
             try {
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
-                    await signInAnonymously(auth);
+                    // Đây là phương thức xác thực khi chạy độc lập
+                    await signInAnonymously(auth); 
                 }
             } catch (error) {
-                displayError(`Lỗi xác thực: ${error.message}`);
+                displayError(`Lỗi xác thực: ${error.message}. Kiểm tra Cấu hình Firebase và quy tắc bảo mật.`);
             }
         }
 
@@ -459,7 +488,8 @@
             if (user) {
                 userId = user.uid;
                 userIdDisplay.textContent = userId;
-                addTaskButton.disabled = false;
+                // KÍCH HOẠT NÚT KHI ĐÃ XÁC THỰC
+                addTaskButton.disabled = false; 
                 
                 // Đường dẫn collection riêng tư cho người dùng
                 const collectionPath = `/artifacts/${appId}/users/${userId}/todos`;
@@ -475,7 +505,8 @@
                 loadingIndicator.textContent = 'Đang chờ xác thực...';
                 addTaskButton.disabled = true;
                 if (!userId) {
-                    authenticateAndSetup();
+                    // Nếu chưa xác thực, thử gọi lại hàm xác thực
+                    authenticateAndSetup(); 
                 }
             }
         });
