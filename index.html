@@ -1,28 +1,944 @@
-Từ điển cá nhân
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ứng dụng Quản Lý Công Việc Chi Tiết</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Thiết lập font chữ Inter và làm mượt font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Màu nền nhẹ */
+        }
+        .task-card {
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.05); /* Shadow nhẹ hơn */
+        }
+        /* Style cho trạng thái Hoàn thành */
+        .status-completed .task-title {
+            text-decoration: line-through;
+            color: #6b7280; 
+        }
+        /* Hiệu ứng xoay cho nút toggle chi tiết */
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
+        .transition-transform {
+            transition: transform 0.3s ease;
+        }
+        /* Cần overflow-x cho biểu đồ Gantt trên thiết bị nhỏ */
+        .gantt-scroll-container {
+            overflow-x: auto;
+            max-width: 100%;
+        }
+        .gantt-timeline-bar {
+            height: 30px; /* Chiều cao thanh Gantt */
+            transition: opacity 0.3s, background-color 0.3s;
+            cursor: pointer;
+        }
+    </style>
+    <!-- Cấu hình Tailwind cho màu sắc và bo góc -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4f46e5', /* Màu tím/xanh chủ đạo */
+                        'secondary': '#10b981', /* Màu xanh lá */
+                        'danger': '#ef4444', /* Màu đỏ */
+                        'warning': '#f59e0b', /* Màu vàng */
+                        'info': '#3b82f6', /* Màu xanh dương */
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="p-4 sm:p-8 flex justify-center min-h-screen">
+
+    <div id="app-container" class="w-full max-w-4xl bg-white shadow-2xl rounded-xl p-6 sm:p-8">
+        <!-- Tiêu đề và ID người dùng -->
+        <h1 class="text-4xl font-extrabold text-primary mb-2 text-center">
+            Quản Lý Công Việc Chi Tiết
+        </h1>
+        <p class="text-xs text-gray-500 mb-6 text-center">
+            <span class="font-semibold">ID Người Dùng:</span> <span id="user-id-display">Đang tải...</span>
+        </p>
+
+        <!-- --- TAB NAVIGATION --- -->
+        <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+            <button id="tab-manager-btn" data-tab="manager"
+                    class="tab-btn py-3 px-4 text-sm font-semibold transition duration-150 border-b-2 border-primary text-primary flex-shrink-0">
+                Quản lý Công việc
+            </button>
+            <button id="tab-stats-btn" data-tab="stats"
+                    class="tab-btn py-3 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300 transition duration-150 flex-shrink-0">
+                Thống kê & Báo cáo
+            </button>
+            <button id="tab-gantt-btn" data-tab="gantt"
+                    class="tab-btn py-3 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300 transition duration-150 flex-shrink-0">
+                Sơ đồ Gantt
+            </button>
+        </div>
+        <!-- --- END TAB NAVIGATION --- -->
+
+        <!-- --- TAB 1: TASK MANAGER --- -->
+        <div id="task-manager-tab">
+            <!-- Form Thêm Công Việc Mới -->
+            <form id="add-task-form" class="bg-gray-50 p-4 rounded-lg shadow-inner mb-8 space-y-3">
+                <h2 class="text-xl font-bold text-gray-700 mb-3">Thêm Công Việc Mới</h2>
+                
+                <input type="text" id="title-input" placeholder="1. Tiêu đề công việc (Bắt buộc)"
+                       class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-800"
+                       required>
+
+                <!-- Description Input -->
+                <textarea id="description-input" placeholder="2. Mô tả chi tiết công việc (Không bắt buộc)"
+                          rows="3"
+                          class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-800"></textarea>
+
+                <!-- Grid cho các trường chi tiết -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    
+                    <!-- Priority Select -->
+                    <div>
+                        <label for="priority-select" class="block text-sm font-medium text-gray-700 mb-1">Mức độ ưu tiên</label>
+                        <select id="priority-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                            <option value="Medium">Trung bình</option>
+                            <option value="High" class="text-red-600">Cao</option>
+                            <option value="Low" class="text-blue-600">Thấp</option>
+                        </select>
+                    </div>
+
+                    <!-- Start Date Input (Mặc định là hôm nay) -->
+                    <div>
+                        <label for="date-start-input" class="block text-sm font-medium text-gray-700 mb-1">Ngày bắt đầu</label>
+                        <input type="date" id="date-start-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-info focus:border-info outline-none">
+                    </div>
+
+                    <!-- Deadline Input (Lựa chọn nhanh hoặc chọn lịch) -->
+                    <div>
+                        <label for="deadline-mode-select" class="block text-sm font-medium text-gray-700 mb-1">Hạn chót</label>
+                        
+                        <!-- Select cho lựa chọn nhanh (1-10 ngày) -->
+                        <select id="deadline-mode-select" 
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-danger focus:border-danger outline-none mb-2">
+                            <option value="none">Không có</option>
+                            <option value="today">Hôm nay</option>
+                            <option value="1">1 ngày nữa</option>
+                            <option value="2">2 ngày nữa</option>
+                            <option value="3">3 ngày nữa</option>
+                            <option value="4">4 ngày nữa</option>
+                            <option value="5">5 ngày nữa</option>
+                            <option value="6">6 ngày nữa</option>
+                            <option value="7">7 ngày nữa (1 tuần)</option>
+                            <option value="8">8 ngày nữa</option>
+                            <option value="9">9 ngày nữa</option>
+                            <option value="10">10 ngày nữa</option>
+                            <option value="specific">Chọn ngày cụ thể...</option>
+                        </select>
+                        
+                        <!-- Input ngày cụ thể (ẩn mặc định) -->
+                        <input type="date" id="date-deadline-input" 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-danger focus:border-danger outline-none hidden">
+                    </div>
+                </div>
+
+                <!-- Nút Thêm -->
+                <button type="submit"
+                        class="w-full bg-primary hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition duration-200 disabled:opacity-50 mt-4"
+                        id="add-task-button" disabled>
+                    Thêm Công Việc
+                </button>
+            </form>
+
+            <!-- Danh sách Công Việc -->
+            <div id="task-list-container">
+                <p id="loading-indicator" class="text-center text-gray-500 py-10">Đang tải công việc...</p>
+                <ul id="task-list" class="space-y-4">
+                    <!-- Công việc sẽ được render tại đây -->
+                </ul>
+            </div>
+        </div>
+        <!-- --- END TAB 1: TASK MANAGER --- -->
+
+        <!-- --- TAB 2: STATISTICS (Ẩn mặc định) --- -->
+        <div id="statistics-tab" class="hidden">
+            <h2 class="text-2xl font-bold text-gray-700 mb-5">Thống kê Tổng quan Công việc</h2>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <!-- Tổng số Tasks -->
+                <div class="bg-primary/10 p-4 rounded-xl shadow-sm border-l-4 border-primary">
+                    <p class="text-sm font-medium text-gray-500">Tổng số Tasks</p>
+                    <p id="stats-total" class="text-3xl font-bold text-primary mt-1">0</p>
+                </div>
+                <!-- Task đã hoàn thành -->
+                <div class="bg-secondary/10 p-4 rounded-xl shadow-sm border-l-4 border-secondary">
+                    <p class="text-sm font-medium text-gray-500">Hoàn thành</p>
+                    <p id="stats-completed" class="text-3xl font-bold text-secondary mt-1">0</p>
+                </div>
+                <!-- Task đang làm -->
+                <div class="bg-blue-500/10 p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
+                    <p class="text-sm font-medium text-gray-500">Đang làm & Chờ</p>
+                    <p id="stats-active" class="text-3xl font-bold text-blue-600 mt-1">0</p>
+                 </div>
+                 <!-- Task quá hạn -->
+                <div class="bg-danger/10 p-4 rounded-xl shadow-sm border-l-4 border-danger">
+                    <p class="text-sm font-medium text-gray-500">Quá hạn</p>
+                    <p id="stats-overdue" class="text-3xl font-bold text-danger mt-1">0</p>
+                </div>
+            </div>
+
+            <!-- Thống kê theo Ưu tiên -->
+            <h3 class="text-xl font-semibold text-gray-700 mb-3 border-t pt-4">Phân loại theo Mức độ ưu tiên</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center p-3 bg-red-100/50 rounded-lg">
+                    <span class="font-medium text-red-700">Cao (High)</span>
+                    <span id="stats-high" class="text-lg font-bold text-red-800">0</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-yellow-100/50 rounded-lg">
+                    <span class="font-medium text-warning-700">Trung bình (Medium)</span>
+                    <span id="stats-medium" class="text-lg font-bold text-warning-800">0</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-blue-100/50 rounded-lg">
+                    <span class="font-medium text-blue-700">Thấp (Low)</span>
+                    <span id="stats-low" class="text-lg font-bold text-blue-800">0</span>
+                </div>
+            </div>
+        </div>
+        <!-- --- END TAB 2: STATISTICS --- -->
+        
+        <!-- --- TAB 3: GANTT CHART (Ẩn mặc định) --- -->
+        <div id="gantt-tab" class="hidden">
+            <h2 class="text-2xl font-bold text-gray-700 mb-5">Sơ đồ Gantt Công việc</h2>
+            
+            <div id="gantt-chart-container" class="bg-white rounded-xl shadow-lg border p-4">
+                <p id="gantt-message" class="text-center text-gray-500 py-10">Không có công việc nào có Ngày bắt đầu và Hạn chót để hiển thị.</p>
+                <div id="gantt-chart-content" class="gantt-scroll-container">
+                    <!-- Biểu đồ Gantt sẽ được render tại đây -->
+                </div>
+            </div>
+            
+        </div>
+        <!-- --- END TAB 3: GANTT CHART --- -->
+
+        <!-- Thông báo lỗi (Ẩn mặc định) -->
+        <div id="error-message" class="hidden mt-6 p-4 bg-danger text-white rounded-lg font-semibold shadow-md">
+            Có lỗi xảy ra khi kết nối với Firestore. Vui lòng kiểm tra console.
+        </div>
+    </div>
+
+    <!-- Khối Script Module cho Firebase và Logic Ứng dụng -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, 
+            query, onSnapshot, serverTimestamp, setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Bật logging chi tiết cho Firebase
+        setLogLevel('Debug');
+
+        // --- 1. KHỞI TẠO FIREBASE VÀ AUTHENTICATION ---
+        let db;
+        let auth;
+        let userId = null;
+        let todosCollectionRef = null;
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        // Lấy các phần tử DOM
+        const taskList = document.getElementById('task-list');
+        const titleInput = document.getElementById('title-input');
+        const descriptionInput = document.getElementById('description-input');
+        const prioritySelect = document.getElementById('priority-select');
+        const dateStartInput = document.getElementById('date-start-input');
+        const dateDeadlineInput = document.getElementById('date-deadline-input'); 
+        const deadlineModeSelect = document.getElementById('deadline-mode-select'); 
+        const addTaskForm = document.getElementById('add-task-form');
+        const addTaskButton = document.getElementById('add-task-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const userIdDisplay = document.getElementById('user-id-display');
+        const errorMessage = document.getElementById('error-message');
+        
+        // DOM cho Tabs
+        const tabManagerBtn = document.getElementById('tab-manager-btn');
+        const tabStatsBtn = document.getElementById('tab-stats-btn');
+        const tabGanttBtn = document.getElementById('tab-gantt-btn'); // NEW
+        const taskManagerTab = document.getElementById('task-manager-tab');
+        const statisticsTab = document.getElementById('statistics-tab');
+        const ganttTab = document.getElementById('gantt-tab'); // NEW
+        const ganttChartContent = document.getElementById('gantt-chart-content'); // NEW
+        const ganttMessage = document.getElementById('gantt-message'); // NEW
+        
+        // DOM cho Stats
+        const statsTotal = document.getElementById('stats-total');
+        const statsCompleted = document.getElementById('stats-completed');
+        const statsActive = document.getElementById('stats-active');
+        const statsOverdue = document.getElementById('stats-overdue');
+        const statsHigh = document.getElementById('stats-high');
+        const statsMedium = document.getElementById('stats-medium');
+        const statsLow = document.getElementById('stats-low');
+        
+        let currentTodos = [];
+
+        // --- HÀM XỬ LÝ GIAO DIỆN CHUNG ---
+        
+        /**
+         * Chuyển đổi giữa các Tab
+         * @param {string} tabName - 'manager', 'stats' hoặc 'gantt'
+         */
+        function switchTab(tabName) {
+            // Ẩn tất cả các tab content
+            taskManagerTab.classList.add('hidden');
+            statisticsTab.classList.add('hidden');
+            ganttTab.classList.add('hidden');
+
+            // Hiển thị tab được chọn
+            if (tabName === 'manager') {
+                taskManagerTab.classList.remove('hidden');
+            } else if (tabName === 'stats') {
+                statisticsTab.classList.remove('hidden');
+                calculateAndRenderStats(currentTodos); // Cập nhật thống kê khi chuyển tab
+            } else if (tabName === 'gantt') {
+                ganttTab.classList.remove('hidden');
+                renderGanttChart(currentTodos); // Render Gantt khi chuyển tab
+            }
+
+            // Cập nhật style cho nút tab
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const isSelected = btn.dataset.tab === tabName;
+                btn.classList.toggle('border-primary', isSelected);
+                btn.classList.toggle('text-primary', isSelected);
+                btn.classList.toggle('border-b-2', isSelected);
+                
+                btn.classList.toggle('text-gray-500', !isSelected);
+                btn.classList.toggle('font-medium', !isSelected);
+                btn.classList.toggle('font-semibold', isSelected);
+                btn.classList.toggle('hover:border-gray-300', !isSelected);
+            });
+        }
+        
+        // Gắn sự kiện chuyển tab
+        tabManagerBtn.addEventListener('click', () => switchTab('manager'));
+        tabStatsBtn.addEventListener('click', () => switchTab('stats'));
+        tabGanttBtn.addEventListener('click', () => switchTab('gantt')); // NEW
 
 
+        // --- LOGIC NGÀY THÁNG VÀ MÀU SẮC ---
+        
+        /**
+         * Lấy ngày hiện tại ở định dạng YYYY-MM-DD
+         */
+        function getTodayDateString() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0'); 
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        /**
+         * Tính ngày trong tương lai
+         * @param {number} days - Số ngày thêm vào
+         */
+        function calculateFutureDate(days) {
+            const date = new Date();
+            date.setDate(date.getDate() + parseInt(days, 10));
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        /**
+         * Lấy màu sắc Tailwind cho mức độ ưu tiên
+         */
+        function getPriorityColor(priority, type = 'bg') {
+            switch (priority) {
+                case 'High':
+                    return `${type}-red-500`;
+                case 'Medium':
+                    return `${type}-warning`;
+                case 'Low':
+                    return `${type}-info`;
+                default:
+                    return `${type}-gray-400`;
+            }
+        }
+        
+        /**
+         * Lấy màu sắc Tailwind cho tình trạng công việc
+         */
+        function getStatusColor(status) {
+            switch (status) {
+                case 'Completed':
+                    return 'bg-secondary'; // Xanh lá
+                case 'In Progress':
+                    return 'bg-blue-500'; // Xanh dương
+                case 'Pending':
+                    return 'bg-red-400'; // Đỏ nhạt
+                default:
+                    return 'bg-gray-400';
+            }
+        }
+
+        /**
+         * Kiểm tra xem công việc có bị quá hạn không
+         */
+        function isOverdue(deadlineDate) {
+            if (!deadlineDate) return false;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const deadline = new Date(deadlineDate);
+            // Đặt múi giờ cho deadline để so sánh chính xác với today
+            deadline.setHours(0, 0, 0, 0); 
+            return deadline.getTime() < today.getTime();
+        }
+        
+        // Hàm tính khoảng cách ngày (đã làm tròn)
+        function dateDiffInDays(date1, date2) {
+            const ONE_DAY = 1000 * 60 * 60 * 24;
+            // Tính toán sự khác biệt giữa hai ngày và làm tròn lên
+            const diffTime = new Date(date2).getTime() - new Date(date1).getTime();
+            return Math.ceil(diffTime / ONE_DAY);
+        }
+
+        // Đặt giá trị mặc định cho Ngày bắt đầu
+        dateStartInput.value = getTodayDateString();
+        // -----------------------------------------------------------
 
 
+        // Xử lý sự kiện khi chọn chế độ Hạn chót
+        deadlineModeSelect.addEventListener('change', () => {
+            if (deadlineModeSelect.value === 'specific') {
+                dateDeadlineInput.classList.remove('hidden');
+                dateDeadlineInput.value = calculateFutureDate(1); 
+            } else {
+                dateDeadlineInput.classList.add('hidden');
+                dateDeadlineInput.value = ''; 
+            }
+        });
 
 
+        // Hàm xử lý lỗi chung
+        function displayError(message) {
+            console.error(message);
+            errorMessage.textContent = `Lỗi: ${message}. Vui lòng thử lại.`;
+            errorMessage.classList.remove('hidden');
+            loadingIndicator.classList.add('hidden');
+        }
+
+        // Đăng nhập người dùng (Ưu tiên dùng token có sẵn)
+        async function authenticateAndSetup() {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                displayError(`Lỗi xác thực: ${error.message}`);
+            }
+        }
+
+        // Lắng nghe trạng thái xác thực
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                userIdDisplay.textContent = userId;
+                addTaskButton.disabled = false;
+                
+                // Đường dẫn collection riêng tư cho người dùng
+                const collectionPath = `/artifacts/${appId}/users/${userId}/todos`;
+                todosCollectionRef = collection(db, collectionPath);
+                
+                console.log(`Đã xác thực. UserId: ${userId}.`);
+                
+                // Bắt đầu lắng nghe dữ liệu
+                setupRealtimeListener();
+
+            } else {
+                userIdDisplay.textContent = 'Chưa xác thực';
+                loadingIndicator.textContent = 'Đang chờ xác thực...';
+                addTaskButton.disabled = true;
+                if (!userId) {
+                    authenticateAndSetup();
+                }
+            }
+        });
 
 
+        // --- 2. HÀM THAO TÁC VỚI FIRESTORE & RENDER GIAO DIỆN ---
+
+        /**
+         * Render danh sách công việc từ dữ liệu Firestore
+         */
+        function renderTasks(todos) {
+            taskList.innerHTML = '';
+            loadingIndicator.classList.add('hidden');
+            
+            if (todos.length === 0) {
+                taskList.innerHTML = '<p class="text-center text-gray-500 py-6 border-2 border-dashed border-gray-200 rounded-lg">Không có công việc nào. Hãy thêm một công việc mới!</p>';
+                return;
+            }
+
+            // Sắp xếp dữ liệu theo thời gian tạo (từ mới nhất đến cũ nhất)
+            todos.sort((a, b) => {
+                const dateA = a.createdAt ? a.createdAt.toDate().getTime() : 0;
+                const dateB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
+                return dateB - dateA;
+            });
+
+            todos.forEach(task => {
+                const isCompleted = task.status === 'Completed';
+                const priorityColorClass = getPriorityColor(task.priority);
+                const statusColorClass = getStatusColor(task.status);
+                const isOverdueFlag = isOverdue(task.deadlineDate) && !isCompleted;
+
+                const li = document.createElement('li');
+                li.className = `task-card flex flex-col p-4 ${isCompleted ? 'status-completed bg-green-50 border-secondary/50' : 'bg-white border-gray-100 hover:bg-gray-50'} rounded-xl border-l-4 ${isOverdueFlag ? 'border-l-danger' : isCompleted ? 'border-l-secondary' : 'border-l-' + priorityColorClass.split('-')[1] + '-500'}`;
+                li.dataset.id = task.id;
+
+                li.innerHTML = `
+                    <!-- HEADER: Title, Priority, Toggle - Gọn hơn -->
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center min-w-0 pr-2 sm:pr-4">
+                            <!-- Status Dot/Icon -->
+                            <span class="w-3 h-3 rounded-full ${statusColorClass} mr-3 flex-shrink-0"></span>
+                            
+                            <span class="task-title text-lg font-bold text-gray-800 truncate block">${task.title}</span>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2 flex-shrink-0">
+                            <!-- Priority Label (Desktop only) -->
+                            <span class="text-xs font-semibold uppercase text-white px-2 py-0.5 rounded-full ${priorityColorClass} shadow-md hidden sm:inline">
+                                ${task.priority.replace('Low', 'Thấp').replace('Medium', 'Trung bình').replace('High', 'Cao')}
+                            </span>
+                            
+                            <!-- Toggle Button -->
+                            <button class="toggle-details-btn text-gray-400 hover:text-primary transition duration-150" data-id="${task.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Collapsible Details Area (Ẩn mặc định) -->
+                    <div id="details-${task.id}" class="task-details-content space-y-3 pt-3 border-t border-gray-100 hidden">
+                        <!-- Description -->
+                        ${task.description ? `
+                            <div>
+                                <span class="block text-xs font-semibold text-gray-500 mb-1">Mô tả:</span>
+                                <p class="text-sm text-gray-700 whitespace-pre-wrap">${task.description}</p>
+                            </div>
+                        ` : '<p class="text-xs text-gray-400">Không có mô tả chi tiết.</p>'}
+
+                        <!-- Dates and Priority Detail -->
+                        <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                            <!-- Priority (Mobile/Detail View) -->
+                            <div class="flex items-center space-x-2 sm:hidden">
+                                <span class="font-medium">Ưu tiên:</span>
+                                <span class="font-bold text-${priorityColorClass.split('-')[1]}-700">
+                                    ${task.priority.replace('Low', 'Thấp').replace('Medium', 'Trung bình').replace('High', 'Cao')}
+                                </span>
+                            </div>
+                            
+                            <!-- Start Date -->
+                            <div class="flex items-center space-x-2 text-right justify-start col-span-1 ${task.startDate ? '' : 'hidden'}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span>BĐ: ${task.startDate || 'N/A'}</span>
+                            </div>
+                            
+                            <!-- Deadline Date -->
+                            <div class="flex items-center space-x-2 text-right justify-end col-span-1 ${task.deadlineDate ? '' : 'hidden'}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span class="${isOverdueFlag ? 'font-bold text-danger' : 'font-medium'}">Hạn chót: ${task.deadlineDate || 'N/A'}</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- ACTIONS: Toggle & Delete (moved to bottom of card for consistency) -->
+                    <div class="flex justify-end space-x-3 border-t pt-3 mt-3">
+                        <button class="toggle-btn bg-info hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg text-sm shadow-md transition duration-200"
+                            data-id="${task.id}" data-current-status="${task.status}">
+                            ${isCompleted ? 'Chuyển sang Đang làm' : 'Hoàn thành'}
+                        </button>
+                        <button class="delete-btn bg-danger hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm shadow-md transition duration-200"
+                            data-id="${task.id}">
+                            Xóa
+                        </button>
+                    </div>
+                `;
+
+                taskList.appendChild(li);
+            });
+            
+            // Gắn sự kiện sau khi render xong
+            attachTaskEventListeners();
+        }
+        
+        /**
+         * Lấy ngày min/max từ các công việc hợp lệ (có start và deadline)
+         */
+        function getMinMaxDates(todos) {
+            const validTasks = todos.filter(t => t.startDate && t.deadlineDate);
+            if (validTasks.length === 0) return { min: null, max: null, rangeDays: 0 };
+
+            let minDate = new Date(validTasks[0].startDate);
+            let maxDate = new Date(validTasks[0].deadlineDate);
+
+            validTasks.forEach(task => {
+                const start = new Date(task.startDate);
+                const end = new Date(task.deadlineDate);
+
+                if (start.getTime() < minDate.getTime()) minDate = start;
+                if (end.getTime() > maxDate.getTime()) maxDate = end;
+            });
+            
+            // Đặt thời gian về 00:00:00 cho cả hai ngày
+            minDate.setHours(0, 0, 0, 0);
+            maxDate.setHours(0, 0, 0, 0); 
+            
+            // Thêm 1 ngày vào maxDate để bao gồm ngày cuối cùng
+            maxDate.setDate(maxDate.getDate() + 1);
+
+            const rangeDays = dateDiffInDays(minDate, maxDate);
+            
+            return { min: minDate, max: maxDate, rangeDays: rangeDays };
+        }
+        
+        /**
+         * Render Sơ đồ Gantt
+         */
+        function renderGanttChart(todos) {
+            ganttChartContent.innerHTML = '';
+            
+            const validTasks = todos.filter(t => t.startDate && t.deadlineDate);
+
+            if (validTasks.length === 0) {
+                ganttMessage.classList.remove('hidden');
+                return;
+            }
+            ganttMessage.classList.add('hidden');
+
+            const { min: minDate, rangeDays } = getMinMaxDates(validTasks);
+
+            if (rangeDays <= 0) {
+                ganttMessage.classList.remove('hidden');
+                ganttMessage.textContent = 'Không đủ dữ liệu ngày để vẽ biểu đồ Gantt.';
+                return;
+            }
+
+            // Chiều rộng tối thiểu là 800px hoặc lớn hơn nếu cần cho độ phân giải tốt
+            const chartWidth = Math.max(800, rangeDays * 50); 
+            
+            let html = `
+                <div style="width: ${chartWidth}px;" class="min-w-full">
+                    <!-- Date Headers (Timeline) -->
+                    <div id="gantt-headers" class="flex border-b border-gray-300 mb-4 bg-gray-50 sticky top-0 z-10 shadow-sm">
+            `;
+            
+            // Tạo các cột ngày (sẽ hiển thị tối đa 30 cột cho giao diện dễ nhìn, nếu quá dài thì chỉ hiển thị ngày quan trọng)
+            const headersToShow = Math.min(rangeDays, 30); 
+            const step = Math.ceil(rangeDays / headersToShow);
+            let totalHeaderWidth = 0;
+
+            for (let i = 0; i < rangeDays; i += step) {
+                const d = new Date(minDate);
+                d.setDate(minDate.getDate() + i);
+                
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                
+                const widthPercent = (step / rangeDays) * 100;
+                totalHeaderWidth += widthPercent;
+
+                html += `
+                    <div style="width: ${widthPercent}%; min-width: 50px;"
+                         class="text-xs font-semibold text-gray-700 text-center border-l border-gray-200 py-2 px-1 flex-shrink-0">
+                        ${day}/${month}
+                    </div>
+                `;
+            }
+            // Đảm bảo tổng chiều rộng là 100% nếu có sai số làm tròn
+            if (totalHeaderWidth < 100) {
+                 html += `<div style="width: ${100 - totalHeaderWidth}%;" class="border-l border-gray-200"></div>`;
+            }
+            
+            html += `</div> <!-- End Gantt Headers -->`;
+            
+            // Task Rows
+            validTasks.forEach(task => {
+                const start = new Date(task.startDate);
+                const end = new Date(task.deadlineDate);
+                start.setHours(0, 0, 0, 0);
+                end.setHours(0, 0, 0, 0);
+
+                // Độ lệch từ ngày bắt đầu nhỏ nhất (minDate) đến ngày bắt đầu của task
+                const startOffsetDays = dateDiffInDays(minDate, start);
+                
+                // Khoảng thời gian task kéo dài (bao gồm cả ngày bắt đầu và ngày kết thúc)
+                const durationDays = dateDiffInDays(start, end) + 1; 
+
+                const startOffsetPercent = (startOffsetDays / rangeDays) * 100;
+                const durationPercent = (durationDays / rangeDays) * 100;
+                
+                const isCompleted = task.status === 'Completed';
+                const isOverdueFlag = isOverdue(task.deadlineDate) && !isCompleted;
+
+                let barColor = getPriorityColor(task.priority);
+                
+                if (isCompleted) {
+                    barColor = 'bg-secondary';
+                } else if (isOverdueFlag) {
+                    barColor = 'bg-danger';
+                }
+
+                const opacityClass = isCompleted ? 'opacity-50' : 'opacity-90';
+
+                html += `
+                    <div class="flex items-center space-x-4 py-2 border-b border-gray-100">
+                        <div class="text-xs font-medium text-gray-800 w-1/4 min-w-[150px] truncate" title="${task.title}">${task.title}</div>
+                        <div class="relative flex-grow h-8 bg-gray-100 rounded-lg overflow-hidden">
+                            <div class="gantt-timeline-bar absolute top-0 left-0 h-full rounded-lg text-xs flex items-center justify-center p-1 font-semibold text-white ${barColor} ${opacityClass}"
+                                 style="margin-left: ${startOffsetPercent}%; width: ${durationPercent}%;"
+                                 title="${task.title} (${task.startDate} - ${task.deadlineDate})">
+                                 <span class="truncate px-1">${task.title}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            ganttChartContent.innerHTML += html;
+        }
 
 
+        /**
+         * Tính toán và hiển thị thống kê
+         */
+        function calculateAndRenderStats(todos) {
+            const stats = {
+                total: todos.length,
+                completed: 0,
+                pending: 0, // bao gồm 'In Progress' và 'Pending'
+                overdue: 0,
+                priority: { High: 0, Medium: 0, Low: 0 }
+            };
+
+            todos.forEach(task => {
+                if (task.status === 'Completed') {
+                    stats.completed++;
+                } else {
+                    stats.pending++;
+                }
+
+                if (isOverdue(task.deadlineDate) && task.status !== 'Completed') {
+                    stats.overdue++;
+                }
+
+                if (task.priority in stats.priority) {
+                    stats.priority[task.priority]++;
+                }
+            });
+            
+            // Hiển thị ra DOM
+            statsTotal.textContent = stats.total;
+            statsCompleted.textContent = stats.completed;
+            statsActive.textContent = stats.pending; // Đang làm & Chờ
+            statsOverdue.textContent = stats.overdue;
+            statsHigh.textContent = stats.priority.High;
+            statsMedium.textContent = stats.priority.Medium;
+            statsLow.textContent = stats.priority.Low;
+        }
+
+        /**
+         * Gắn các event listener cho các nút Toggle, Delete, và Toggle Details
+         */
+        function attachTaskEventListeners() {
+            // Event cho nút Hoàn thành/Đang làm
+            document.querySelectorAll('.toggle-btn').forEach(button => {
+                button.onclick = (e) => {
+                    e.stopPropagation(); // Ngăn chặn sự kiện click lan truyền
+                    const id = button.dataset.id;
+                    const currentStatus = button.dataset.currentStatus;
+                    
+                    let newStatus;
+                    if (currentStatus === 'Completed') {
+                        newStatus = 'In Progress'; 
+                    } else {
+                        newStatus = 'Completed';
+                    }
+                    updateTaskStatus(id, newStatus);
+                };
+            });
+
+            // Event cho nút Xóa
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.onclick = (e) => {
+                    e.stopPropagation(); // Ngăn chặn sự kiện click lan truyền
+                    const id = button.dataset.id;
+                    deleteTask(id);
+                };
+            });
+            
+            // Event cho nút Toggle Details
+            document.querySelectorAll('.toggle-details-btn').forEach(button => {
+                button.onclick = (e) => {
+                    e.stopPropagation(); // Ngăn chặn sự kiện click lan truyền
+                    const id = button.dataset.id;
+                    const detailsElement = document.getElementById(`details-${id}`);
+                    
+                    detailsElement.classList.toggle('hidden');
+                    button.querySelector('svg').classList.toggle('rotate-180');
+                };
+            });
+        }
 
 
-Từ điển của tôi
+        /**
+         * Thiết lập lắng nghe theo thời gian thực (Realtime Listener)
+         */
+        function setupRealtimeListener() {
+            if (!todosCollectionRef) return;
+
+            const q = query(todosCollectionRef);
+
+            onSnapshot(q, (snapshot) => {
+                const todos = [];
+                snapshot.forEach(doc => {
+                    todos.push({ id: doc.id, ...doc.data() });
+                });
+                
+                currentTodos = todos; // Lưu trữ dữ liệu hiện tại
+                
+                renderTasks(todos);
+                // Chỉ gọi render stats và gantt nếu đang ở tab đó để tránh lãng phí tài nguyên
+                const activeTab = document.querySelector('.tab-btn.text-primary').dataset.tab;
+                if (activeTab === 'stats') {
+                    calculateAndRenderStats(todos);
+                } else if (activeTab === 'gantt') {
+                    renderGanttChart(todos);
+                }
+
+            }, (error) => {
+                displayError(error.message);
+            });
+        }
+
+        /**
+         * Thêm công việc mới vào Firestore
+         */
+        async function addTask(title, description, priority, startDate, deadlineDate) {
+            if (!todosCollectionRef || !title.trim()) return;
+
+            try {
+                await addDoc(todosCollectionRef, {
+                    title: title.trim(),
+                    description: description.trim() || null, 
+                    status: 'Pending', 
+                    priority: priority,
+                    startDate: startDate || null,
+                    deadlineDate: deadlineDate || null,
+                    createdAt: serverTimestamp() 
+                });
+                
+                // Xóa input sau khi thêm thành công và đặt lại
+                titleInput.value = ''; 
+                descriptionInput.value = '';
+                prioritySelect.value = 'Medium';
+                dateStartInput.value = getTodayDateString(); 
+                deadlineModeSelect.value = 'none'; 
+                dateDeadlineInput.value = ''; 
+                dateDeadlineInput.classList.add('hidden'); 
+
+            } catch (error) {
+                displayError(`Không thể thêm công việc: ${error.message}`);
+            }
+        }
+
+        /**
+         * Cập nhật trạng thái công việc
+         */
+        async function updateTaskStatus(id, newStatus) {
+            if (!todosCollectionRef) return;
+            const taskDocRef = doc(todosCollectionRef, id);
+
+            try {
+                await updateDoc(taskDocRef, {
+                    status: newStatus
+                });
+            } catch (error) {
+                displayError(`Không thể cập nhật trạng thái công việc: ${error.message}`);
+            }
+        }
+
+        /**
+         * Xóa công việc khỏi Firestore
+         */
+        async function deleteTask(id) {
+            if (!todosCollectionRef) return;
+            const taskDocRef = doc(todosCollectionRef, id);
+
+            try {
+                console.log(`Xóa công việc với ID: ${id}`); 
+                await deleteDoc(taskDocRef);
+            } catch (error) {
+                displayError(`Không thể xóa công việc: ${error.message}`);
+            }
+        }
 
 
+        // --- 3. XỬ LÝ SỰ KIỆN GIAO DIỆN ---
 
+        // Xử lý sự kiện gửi form để thêm công việc
+        addTaskForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = titleInput.value;
+            const description = descriptionInput.value;
+            const priority = prioritySelect.value;
+            const startDate = dateStartInput.value;
+            
+            let deadlineDate = null;
+            const deadlineMode = deadlineModeSelect.value;
 
+            if (deadlineMode === 'specific') {
+                deadlineDate = dateDeadlineInput.value;
+            } else if (deadlineMode === 'today') {
+                deadlineDate = getTodayDateString();
+            } else if (parseInt(deadlineMode, 10) > 0) {
+                deadlineDate = calculateFutureDate(deadlineMode);
+            } 
+            
+            if (title) {
+                addTask(title, description, priority, startDate, deadlineDate);
+            }
+        });
 
+        // Khởi động quá trình xác thực
+        if (!auth.currentUser) {
+            authenticateAndSetup();
+        }
 
-
-
-
-
-Chào mừng bạn!
-
-
-Sử dụng thanh tìm kiếm bên trái để tra cứu kiến thức của bạn.
+    </script>
+</body>
+</html>
