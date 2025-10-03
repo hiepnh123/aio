@@ -3,876 +3,2093 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ứng dụng Quản Lý Công Việc (LocalStorage)</title>
-    <!-- Tải Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Kiểm tra Học Phần - DNU</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* Thiết lập font chữ Inter và làm mượt font */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Màu nền nhẹ */
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            padding-top: 140px; /* Space for fixed header */
         }
-        .task-card {
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.05); /* Shadow nhẹ hơn */
+
+        /* Header Styles */
+        .main-header {
+            background: linear-gradient(135deg, #2196F3 0%, #4CAF50 100%);
+            color: white;
+            padding: 30px 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            width: 100%;
+            box-sizing: border-box;
         }
-        /* Style cho trạng thái Hoàn thành */
-        .status-completed .task-title {
-            text-decoration: line-through;
-            color: #6b7280; 
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        /* Hiệu ứng xoay cho nút toggle chi tiết */
-        .rotate-180 {
-            transform: rotate(180deg);
+
+        .header-text {
+            text-align: center;
+            flex: 1;
         }
-        .transition-transform {
-            transition: transform 0.3s ease;
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
         }
-        /* Cần overflow-x cho biểu đồ Gantt trên thiết bị nhỏ */
-        .gantt-scroll-container {
-            overflow-x: auto;
-            max-width: 100%;
+
+        .main-title {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 0 0 10px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            letter-spacing: 1px;
         }
-        .gantt-timeline-bar {
-            height: 30px; /* Chiều cao thanh Gantt */
-            transition: opacity 0.3s, background-color 0.3s;
+
+        .sub-title {
+            font-size: 1.1em;
+            margin: 0;
+            opacity: 0.9;
+            font-weight: 300;
+            font-style: italic;
+        }
+
+        .login-btn, .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
             cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
         }
-    </style>
-    <!-- Cấu hình Tailwind cho màu sắc và bo góc -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'primary': '#4f46e5', /* Màu tím/xanh chủ đạo */
-                        'secondary': '#10b981', /* Màu xanh lá */
-                        'danger': '#ef4444', /* Màu đỏ */
-                        'warning': '#f59e0b', /* Màu vàng */
-                        'info': '#3b82f6', /* Màu xanh dương */
-                    }
-                }
+
+        .login-btn:hover, .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .main-container {
+            padding: 20px;
+            padding-top: 120px; /* Space for fixed tabs */
+        }
+
+        /* Login Modal */
+        .login-modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin: 15px 0;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .password-input:focus {
+            border-color: #4CAF50;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .modal-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .login-submit-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .login-submit-btn:hover {
+            background: #45a049;
+        }
+
+        .cancel-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background: #d32f2f;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-size: 14px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* Tab Navigation */
+        .tab-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: fixed;
+            top: 140px; /* Below fixed header */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            width: calc(100% - 40px); /* Account for padding */
+            max-width: 1200px;
+        }
+
+        /* Hidden state for non-logged in users */
+        .tab-container.not-logged-in .tab-nav {
+            background: white;
+            border-radius: 0px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .tab-container.not-logged-in .tab-button {
+            display: none !important;
+        }
+
+        .default-message {
+            display: none;
+            color: #666;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: center;
+            padding: 15px 20px;
+        }
+
+        .tab-container.not-logged-in .default-message {
+            display: block;
+        }
+
+        .tab-nav {
+            display: flex;
+            background: white;
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+            border-right: 1px solid #ddd;
+        }
+
+        .tab-button:last-child {
+            border-right: none;
+        }
+
+        .tab-button.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .tab-button:hover:not(.active) {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            min-height: 70vh;
+            max-height: calc(100vh - 260px);
+            overflow-y: auto;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 260px); /* Full height minus header and tab space */
+        }
+
+        /* Phần tìm kiếm */
+        .search-section {
+            flex: 1;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+        }
+
+        .search-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+
+        .search-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-bar {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-bar:focus {
+            border-color: #4CAF50;
+        }
+
+        .search-button {
+            width: 100%;
+            margin-top: 15px;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .search-button:hover {
+            background-color: #45a049;
+        }
+
+        /* Dropdown gợi ý */
+        .suggestions-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: all 0.2s ease;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.highlighted {
+            background-color: #f8f9fa;
+            border-left: 3px solid #4CAF50;
+            padding-left: 13px;
+        }
+
+        .suggestion-word {
+            font-weight: 600;
+            color: #2196F3;
+            font-size: 14px;
+        }
+
+        .suggestion-category {
+            font-size: 11px;
+            color: #666;
+            background: #e3f2fd;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            display: inline-block;
+            font-weight: 500;
+        }
+
+        .suggestion-description {
+            font-size: 11px;
+            color: #777;
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+
+        .suggestion-description div {
+            margin-top: 3px;
+        }
+
+        /* Styles for clickable department elements */
+        .department-clickable {
+            position: relative;
+        }
+
+        .department-clickable::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            padding: 1px;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: exclude;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .department-clickable:hover::after {
+            opacity: 1;
+        }
+
+        .highlight {
+            background-color: #ffeb3b;
+            font-weight: bold;
+        }
+
+        /* Import Tab Styles */
+        .import-section {
+            padding: 30px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .import-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .import-header h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .import-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            border: 2px dashed #4CAF50;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            background: #f9f9f9;
+            transition: all 0.3s;
+        }
+
+        .upload-area:hover {
+            background: #f0f8ff;
+            border-color: #2196F3;
+        }
+
+        .upload-area.drag-over {
+            background: #e8f5e8;
+            border-color: #4CAF50;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .upload-btn:hover {
+            background: #45a049;
+        }
+
+        .preview-section {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .preview-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .preview-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .import-actions {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .import-final-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: background-color 0.3s;
+        }
+
+        .import-final-btn:hover {
+            background: #1976D2;
+        }
+
+        .cancel-btn {
+            background: #f44336;
+        }
+
+        .cancel-btn:hover {
+            background: #d32f2f;
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            display: none;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .format-info {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .format-info h4 {
+            color: #1976D2;
+            margin-bottom: 10px;
+        }
+
+        .format-info ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .format-info li {
+            margin: 5px 0;
+            color: #555;
+        }
+
+        /* Sheet Selector Styles */
+        .sheet-selector {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            display: none;
+        }
+
+        .sheet-selector h4 {
+            color: #495057;
+            margin-bottom: 15px;
+        }
+
+        .sheet-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .sheet-item {
+            padding: 12px 16px;
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .sheet-item:hover {
+            border-color: #4CAF50;
+            background: #f8fff8;
+        }
+
+        .sheet-item.selected {
+            border-color: #4CAF50;
+            background: #4CAF50;
+            color: white;
+        }
+
+        .sheet-item .sheet-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .sheet-item .sheet-info {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+
+        .sheet-actions {
+            text-align: center;
+        }
+
+        .process-sheet-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .process-sheet-btn:hover {
+            background: #1976D2;
+        }
+
+        .process-sheet-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Multi-select styles */
+        .sheet-checkbox {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 18px;
+            height: 18px;
+            accent-color: #4CAF50;
+        }
+
+        .sheet-item {
+            position: relative;
+            padding-left: 35px;
+        }
+
+        .sheet-item.checked {
+            border-color: #4CAF50;
+            background: #f8fff8;
+        }
+
+        .multi-select-controls {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .select-all-btn, .select-none-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: background-color 0.3s;
+        }
+
+        .select-all-btn:hover {
+            background: #5a6268;
+        }
+
+        .select-none-btn:hover {
+            background: #5a6268;
+        }
+
+        .selected-count {
+            color: #4CAF50;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        /* Phần hiển thị kết quả */
+        .results-section {
+            flex: 2;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            max-height: calc(100vh - 260px);
+        }
+
+        .results-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            margin-top: 50px;
+        }
+
+        .result-item {
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background-color: #fafafa;
+            transition: background-color 0.3s;
+        }
+
+        .result-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .result-title {
+            font-weight: bold;
+            color: #2196F3;
+            margin-bottom: 5px;
+        }
+
+        .result-description {
+            color: #666;
+            line-height: 1.4;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-title {
+                font-size: 1.8em;
+            }
+            
+            .sub-title {
+                font-size: 1em;
+            }
+            
+            .main-header {
+                padding: 20px 15px;
+            }
+            
+            .container {
+                flex-direction: column;
+                height: auto;
+            }
+            
+            .search-section, .results-section {
+                flex: none;
             }
         }
-    </script>
+    </style>
 </head>
-<body class="p-4 sm:p-8 flex justify-center min-h-screen">
-
-    <div id="app-container" class="w-full max-w-4xl bg-white shadow-2xl rounded-xl p-6 sm:p-8">
-        <!-- Tiêu đề và ID người dùng -->
-        <h1 class="text-4xl font-extrabold text-primary mb-2 text-center">
-            Quản Lý Công Việc Chi Tiết
-        </h1>
-        <p class="text-xs text-gray-500 mb-6 text-center">
-            <span class="font-semibold">Lưu trữ:</span> <span id="storage-status-display" class="text-green-600">Local Browser Storage</span>
-        </p>
-
-        <!-- --- TAB NAVIGATION --- -->
-        <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
-            <button id="tab-manager-btn" data-tab="manager"
-                    class="tab-btn py-3 px-4 text-sm font-semibold transition duration-150 border-b-2 border-primary text-primary flex-shrink-0">
-                Quản lý Công việc
-            </button>
-            <button id="tab-stats-btn" data-tab="stats"
-                    class="tab-btn py-3 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300 transition duration-150 flex-shrink-0">
-                Thống kê & Báo cáo
-            </button>
-            <button id="tab-gantt-btn" data-tab="gantt"
-                    class="tab-btn py-3 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300 transition duration-150 flex-shrink-0">
-                Sơ đồ Gantt
-            </button>
-        </div>
-        <!-- --- END TAB NAVIGATION --- -->
-
-        <!-- --- TAB 1: TASK MANAGER --- -->
-        <div id="task-manager-tab">
-            <!-- Form Thêm Công Việc Mới -->
-            <form id="add-task-form" class="bg-gray-50 p-4 rounded-lg shadow-inner mb-8 space-y-3">
-                <h2 class="text-xl font-bold text-gray-700 mb-3">Thêm Công Việc Mới</h2>
-                
-                <input type="text" id="title-input" placeholder="1. Tiêu đề công việc (Bắt buộc)"
-                       class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-800"
-                       required>
-
-                <!-- Description Input -->
-                <textarea id="description-input" placeholder="2. Mô tả chi tiết công việc (Không bắt buộc)"
-                          rows="3"
-                          class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-800"></textarea>
-
-                <!-- Grid cho các trường chi tiết -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    
-                    <!-- Priority Select -->
-                    <div>
-                        <label for="priority-select" class="block text-sm font-medium text-gray-700 mb-1">Mức độ ưu tiên</label>
-                        <select id="priority-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
-                            <option value="Medium">Trung bình</option>
-                            <option value="High" class="text-red-600">Cao</option>
-                            <option value="Low" class="text-blue-600">Thấp</option>
-                        </select>
-                    </div>
-
-                    <!-- Start Date Input (Mặc định là hôm nay) -->
-                    <div>
-                        <label for="date-start-input" class="block text-sm font-medium text-gray-700 mb-1">Ngày bắt đầu</label>
-                        <input type="date" id="date-start-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-info focus:border-info outline-none">
-                    </div>
-
-                    <!-- Deadline Input (Lựa chọn nhanh hoặc chọn lịch) -->
-                    <div>
-                        <label for="deadline-mode-select" class="block text-sm font-medium text-gray-700 mb-1">Hạn chót</label>
-                        
-                        <!-- Select cho lựa chọn nhanh (1-10 ngày) -->
-                        <select id="deadline-mode-select" 
-                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-danger focus:border-danger outline-none mb-2">
-                            <option value="none">Không có</option>
-                            <option value="today">Hôm nay</option>
-                            <option value="1">1 ngày nữa</option>
-                            <option value="2">2 ngày nữa</option>
-                            <option value="3">3 ngày nữa</option>
-                            <option value="4">4 ngày nữa</option>
-                            <option value="5">5 ngày nữa</option>
-                            <option value="6">6 ngày nữa</option>
-                            <option value="7">7 ngày nữa (1 tuần)</option>
-                            <option value="8">8 ngày nữa</option>
-                            <option value="9">9 ngày nữa</option>
-                            <option value="10">10 ngày nữa</option>
-                            <option value="specific">Chọn ngày cụ thể...</option>
-                        </select>
-                        
-                        <!-- Input ngày cụ thể (ẩn mặc định) -->
-                        <input type="date" id="date-deadline-input" 
-                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-danger focus:border-danger outline-none hidden">
-                    </div>
-                </div>
-
-                <!-- Nút Thêm -->
-                <button type="submit"
-                        class="w-full bg-primary hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg shadow-md transition duration-200 mt-4"
-                        id="add-task-button">
-                    Thêm Công Việc
+<body>
+    <!-- Main Header -->
+    <div class="main-header">
+        <div class="header-content">
+            <div class="header-text">
+                <h1 class="main-title">TRANG TRA CỨU HỌC PHẦN</h1>
+                <p class="sub-title">Trung tâm phát triển CTĐT - Đại học Đại Nam</p>
+            </div>
+            <div class="header-actions">
+                <button id="loginBtn" class="login-btn" onclick="openLoginModal()">
+                    🔐 Admin Login
                 </button>
-            </form>
-
-            <!-- Danh sách Công Việc -->
-            <div id="task-list-container">
-                <p id="loading-indicator" class="text-center text-gray-500 py-10 hidden">Đang tải công việc...</p>
-                <ul id="task-list" class="space-y-4">
-                    <!-- Công việc sẽ được render tại đây -->
-                </ul>
+                <button id="logoutBtn" class="logout-btn" onclick="logout()" style="display: none;">
+                    🚪 Logout
+                </button>
             </div>
-        </div>
-        <!-- --- END TAB 1: TASK MANAGER --- -->
-
-        <!-- --- TAB 2: STATISTICS (Ẩn mặc định) --- -->
-        <div id="statistics-tab" class="hidden">
-            <h2 class="text-2xl font-bold text-gray-700 mb-5">Thống kê Tổng quan Công việc</h2>
-            
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <!-- Tổng số Tasks -->
-                <div class="bg-primary/10 p-4 rounded-xl shadow-sm border-l-4 border-primary">
-                    <p class="text-sm font-medium text-gray-500">Tổng số Tasks</p>
-                    <p id="stats-total" class="text-3xl font-bold text-primary mt-1">0</p>
-                </div>
-                <!-- Task đã hoàn thành -->
-                <div class="bg-secondary/10 p-4 rounded-xl shadow-sm border-l-4 border-secondary">
-                    <p class="text-sm font-medium text-gray-500">Hoàn thành</p>
-                    <p id="stats-completed" class="text-3xl font-bold text-secondary mt-1">0</p>
-                </div>
-                <!-- Task đang làm -->
-                <div class="bg-blue-500/10 p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
-                    <p class="text-sm font-medium text-gray-500">Đang làm & Chờ</p>
-                    <p id="stats-active" class="text-3xl font-bold text-blue-600 mt-1">0</p>
-                 </div>
-                 <!-- Task quá hạn -->
-                <div class="bg-danger/10 p-4 rounded-xl shadow-sm border-l-4 border-danger">
-                    <p class="text-sm font-medium text-gray-500">Quá hạn</p>
-                    <p id="stats-overdue" class="text-3xl font-bold text-danger mt-1">0</p>
-                </div>
-            </div>
-
-            <!-- Thống kê theo Ưu tiên -->
-            <h3 class="text-xl font-semibold text-gray-700 mb-3 border-t pt-4">Phân loại theo Mức độ ưu tiên</h3>
-            <div class="space-y-3">
-                <div class="flex justify-between items-center p-3 bg-red-100/50 rounded-lg">
-                    <span class="font-medium text-red-700">Cao (High)</span>
-                    <span id="stats-high" class="text-lg font-bold text-red-800">0</span>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-yellow-100/50 rounded-lg">
-                    <span class="font-medium text-warning-700">Trung bình (Medium)</span>
-                    <span id="stats-medium" class="text-lg font-bold text-warning-800">0</span>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-blue-100/50 rounded-lg">
-                    <span class="font-medium text-blue-700">Thấp (Low)</span>
-                    <span id="stats-low" class="text-lg font-bold text-blue-800">0</span>
-                </div>
-            </div>
-        </div>
-        <!-- --- END TAB 2: STATISTICS --- -->
-        
-        <!-- --- TAB 3: GANTT CHART (Ẩn mặc định) --- -->
-        <div id="gantt-tab" class="hidden">
-            <h2 class="text-2xl font-bold text-gray-700 mb-5">Sơ đồ Gantt Công việc</h2>
-            
-            <div id="gantt-chart-container" class="bg-white rounded-xl shadow-lg border p-4">
-                <p id="gantt-message" class="text-center text-gray-500 py-10">Không có công việc nào có Ngày bắt đầu và Hạn chót để hiển thị.</p>
-                <div id="gantt-chart-content" class="gantt-scroll-container">
-                    <!-- Biểu đồ Gantt sẽ được render tại đây -->
-                </div>
-            </div>
-            
-        </div>
-        <!-- --- END TAB 3: GANTT CHART --- -->
-
-        <!-- Thông báo lỗi (Ẩn mặc định) -->
-        <div id="error-message" class="hidden mt-6 p-4 bg-danger text-white rounded-lg font-semibold shadow-md">
-            Lỗi khi xử lý dữ liệu LocalStorage. Vui lòng kiểm tra console.
         </div>
     </div>
 
-    <!-- Khối Script cho Logic Ứng dụng -->
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Tab Navigation -->
+        <div class="tab-container" id="tabContainer">
+        <div class="tab-nav">
+            <div class="default-message" id="defaultMessage">
+                📚 Liên hệ ccd@dainam.edu.vn nếu cần tư vấn thêm
+            </div>
+            <button class="tab-button active" onclick="switchTab('search')" id="searchTabBtn">
+                🔍 Tìm Kiếm
+            </button>
+            <button class="tab-button" onclick="switchTab('import')" id="importTabBtn" style="display: none;">
+                📁 Tạo Database
+            </button>
+        </div>
+
+        <!-- Tab 1: Tìm kiếm -->
+        <div id="searchTab" class="tab-content active">
+            <div class="container">
+                <!-- Phần tìm kiếm -->
+                <div class="search-section">
+                    <h2>🔍 Tìm Kiếm Học Phần</h2>
+                    <div class="search-container">
+                        <input type="text" id="searchInput" class="search-bar" placeholder="Nhập từ khóa tìm kiếm..." autocomplete="off">
+                        <div id="suggestionsDropdown" class="suggestions-dropdown"></div>
+                    </div>
+                    <button onclick="performSearch()" class="search-button">Tìm Kiếm</button>
+                </div>
+
+                <!-- Phần hiển thị kết quả -->
+                <div class="results-section">
+                    <h2>📊 Kết Quả Tìm Kiếm</h2>
+                    <div id="resultsContainer">
+                        <div class="no-results">
+                            Đang tải dữ liệu...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Import Excel -->
+        <div id="importTab" class="tab-content">
+            <div class="import-section">
+                <div class="import-header">
+                    <h2>� Tạo Database JSON Từ Excel</h2>
+                    <p>Upload file Excel (.xlsx) để tạo file data.json mới cho việc upload lên host</p>
+                </div>
+
+                <!-- Upload Area -->
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <h3>Kéo thả file Excel vào đây</h3>
+                    <p>hoặc</p>
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                        Chọn File Excel
+                    </button>
+                    <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls" onchange="handleFileSelect(event)">
+                    <p style="margin-top: 15px; color: #666; font-size: 12px;">Hỗ trợ: .xlsx, .xls (tối đa 10MB)</p>
+                </div>
+
+                <!-- Status Messages -->
+                <div id="statusMessage" class="status-message"></div>
+
+                <!-- Sheet Selector -->
+                <div id="sheetSelector" class="sheet-selector">
+                    <h4>📊 Chọn Sheet để Import: <span class="selected-count" id="selectedCount">(0 sheet đã chọn)</span></h4>
+                    
+                    <div class="multi-select-controls">
+                        <button class="select-all-btn" onclick="selectAllSheets()">✅ Chọn Tất Cả</button>
+                        <button class="select-none-btn" onclick="selectNoSheets()">❌ Bỏ Chọn Tất Cả</button>
+                    </div>
+                    
+                    <div id="sheetList" class="sheet-list"></div>
+                    <div class="sheet-actions">
+                        <button id="processSheetBtn" class="process-sheet-btn" onclick="processSelectedSheets()" disabled>
+                            ✅ Xử Lý Sheet Đã Chọn
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Format Info -->
+                <div class="format-info">
+                    <h4>📋 Định dạng file Excel:</h4>
+                    <ul>
+                        <li><strong>Dòng đầu tiên:</strong> Tên các cột (STT, Mã HP, Tên Tiếng Việt, Tên Tiếng Anh, v.v.)</li>
+                        <li><strong>Các dòng tiếp theo:</strong> Dữ liệu tương ứng với từng cột</li>
+                        <li><strong>Tự động phát hiện:</strong> Hệ thống sẽ sử dụng tên header làm tên trường hiển thị</li>
+                        <li><strong>Tags/Keywords:</strong> Nếu tên cột chứa "tag" hoặc "keyword", sẽ tự động xử lý như danh sách</li>
+                    </ul>
+                    <p style="margin-top: 10px; color: #666;"><strong>Ví dụ:</strong> STT | Mã HP | Tên Tiếng Việt | Tên Tiếng Anh</p>
+                </div>
+
+                <!-- Preview Section -->
+                <div id="previewSection" class="preview-section">
+                    <h3>🔍 Preview Dữ Liệu:</h3>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        <table id="previewTable" class="preview-table">
+                            <thead id="previewTableHead">
+                                <!-- Headers sẽ được tạo động từ Excel -->
+                            </thead>
+                            <tbody id="previewTableBody"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="import-actions">
+                        <button class="import-final-btn" onclick="generateJSON()">
+                            💾 Tải File data.json
+                        </button>
+                        <button class="import-final-btn cancel-btn" onclick="cancelImport()">
+                            ❌ Hủy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- End Main Container -->
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="login-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔐 Admin Login</h2>
+                <p style="color: #666; font-size: 14px;">Nhập mật khẩu để truy cập chức năng quản trị</p>
+            </div>
+            <div class="modal-body">
+                <input type="password" id="passwordInput" class="password-input" placeholder="Nhập mật khẩu admin..." maxlength="50">
+                <div id="errorMessage" class="error-message">Mật khẩu không đúng!</div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn login-submit-btn" onclick="attemptLogin()">🔓 Đăng Nhập</button>
+                <button class="modal-btn cancel-btn" onclick="closeLoginModal()">❌ Hủy</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        
-        // --- CẤU HÌNH VÀ BIẾN TOÀN CỤC ---
-        const LOCAL_STORAGE_KEY = 'todoListTasks';
-        let currentTodos = [];
+        let dictionaryData = [];
+        let currentHighlightIndex = -1;
+        let pendingImportData = [];
+        let dataStructure = {}; // Store dynamic field structure
+        let excelWorkbook = null; // Store loaded Excel workbook
+        let selectedSheetNames = []; // Store multiple selected sheet names
+        let isLoggedIn = false; // Authentication state
+        const ADMIN_PASSWORD = "admin123"; // Change this to your desired password
 
-        // Lấy các phần tử DOM
-        const taskList = document.getElementById('task-list');
-        const titleInput = document.getElementById('title-input');
-        const descriptionInput = document.getElementById('description-input');
-        const prioritySelect = document.getElementById('priority-select');
-        const dateStartInput = document.getElementById('date-start-input');
-        const dateDeadlineInput = document.getElementById('date-deadline-input'); 
-        const deadlineModeSelect = document.getElementById('deadline-mode-select'); 
-        const addTaskForm = document.getElementById('add-task-form');
-        const addTaskButton = document.getElementById('add-task-button');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const errorMessage = document.getElementById('error-message');
-        
-        // DOM cho Tabs
-        const tabManagerBtn = document.getElementById('tab-manager-btn');
-        const tabStatsBtn = document.getElementById('tab-stats-btn');
-        const tabGanttBtn = document.getElementById('tab-gantt-btn'); 
-        const taskManagerTab = document.getElementById('task-manager-tab');
-        const statisticsTab = document.getElementById('statistics-tab');
-        const ganttTab = document.getElementById('gantt-tab'); 
-        const ganttChartContent = document.getElementById('gantt-chart-content'); 
-        const ganttMessage = document.getElementById('gantt-message'); 
-        
-        // DOM cho Stats
-        const statsTotal = document.getElementById('stats-total');
-        const statsCompleted = document.getElementById('stats-completed');
-        const statsActive = document.getElementById('stats-active');
-        const statsOverdue = document.getElementById('stats-overdue');
-        const statsHigh = document.getElementById('stats-high');
-        const statsMedium = document.getElementById('stats-medium');
-        const statsLow = document.getElementById('stats-low');
-        
-        // --- HÀM XỬ LÝ DỮ LIỆU LOCALSTORAGE ---
-
-        /**
-         * Lấy dữ liệu công việc từ LocalStorage
-         */
-        function loadTasks() {
-            try {
-                const storedTasks = localStorage.getItem(LOCAL_STORAGE_KEY);
-                return storedTasks ? JSON.parse(storedTasks) : [];
-            } catch (error) {
-                console.error("Lỗi khi tải dữ liệu từ LocalStorage:", error);
-                displayError("Không thể tải dữ liệu. LocalStorage có thể bị lỗi.");
-                return [];
-            }
-        }
-        
-        /**
-         * Lưu dữ liệu công việc vào LocalStorage
-         */
-        function saveTasks() {
-            try {
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentTodos));
-                // Sau khi lưu, gọi lại hàm render để cập nhật toàn bộ giao diện
-                updateAppUI(); 
-            } catch (error) {
-                console.error("Lỗi khi lưu dữ liệu vào LocalStorage:", error);
-                displayError("Không thể lưu dữ liệu. LocalStorage có thể bị đầy.");
-            }
-        }
-        
-        /**
-         * Cập nhật toàn bộ giao diện (danh sách, thống kê, gantt)
-         */
-        function updateAppUI() {
-            renderTasks(currentTodos);
-            const activeTab = document.querySelector('.tab-btn.text-primary').dataset.tab;
-            if (activeTab === 'stats') {
-                calculateAndRenderStats(currentTodos);
-            } else if (activeTab === 'gantt') {
-                renderGanttChart(currentTodos);
-            }
+        // Authentication functions
+        function openLoginModal() {
+            document.getElementById('loginModal').style.display = 'block';
+            document.getElementById('passwordInput').focus();
         }
 
-        // --- HÀM XỬ LÝ GIAO DIỆN CHUNG ---
-        
-        /**
-         * Chuyển đổi giữa các Tab
-         * @param {string} tabName - 'manager', 'stats' hoặc 'gantt'
-         */
-        function switchTab(tabName) {
-            // Ẩn tất cả các tab content
-            taskManagerTab.classList.add('hidden');
-            statisticsTab.classList.add('hidden');
-            ganttTab.classList.add('hidden');
-
-            // Hiển thị tab được chọn
-            if (tabName === 'manager') {
-                taskManagerTab.classList.remove('hidden');
-            } else if (tabName === 'stats') {
-                statisticsTab.classList.remove('hidden');
-                calculateAndRenderStats(currentTodos); // Cập nhật thống kê khi chuyển tab
-            } else if (tabName === 'gantt') {
-                ganttTab.classList.remove('hidden');
-                renderGanttChart(currentTodos); // Render Gantt khi chuyển tab
-            }
-
-            // Cập nhật style cho nút tab
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                const isSelected = btn.dataset.tab === tabName;
-                btn.classList.toggle('border-primary', isSelected);
-                btn.classList.toggle('text-primary', isSelected);
-                btn.classList.toggle('border-b-2', isSelected);
-                
-                btn.classList.toggle('text-gray-500', !isSelected);
-                btn.classList.toggle('font-medium', !isSelected);
-                btn.classList.toggle('font-semibold', isSelected);
-                btn.classList.toggle('hover:border-gray-300', !isSelected);
-            });
-        }
-        
-        // Gắn sự kiện chuyển tab
-        tabManagerBtn.addEventListener('click', () => switchTab('manager'));
-        tabStatsBtn.addEventListener('click', () => switchTab('stats'));
-        tabGanttBtn.addEventListener('click', () => switchTab('gantt')); 
-
-
-        // --- LOGIC NGÀY THÁNG VÀ MÀU SẮC ---
-        
-        /**
-         * Lấy ngày hiện tại ở định dạng YYYY-MM-DD
-         */
-        function getTodayDateString() {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0'); 
-            const day = String(today.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-        
-        /**
-         * Tính ngày trong tương lai
-         * @param {number} days - Số ngày thêm vào
-         */
-        function calculateFutureDate(days) {
-            const date = new Date();
-            date.setDate(date.getDate() + parseInt(days, 10));
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-        
-        /**
-         * Lấy màu sắc Tailwind cho mức độ ưu tiên
-         */
-        function getPriorityColor(priority, type = 'bg') {
-            switch (priority) {
-                case 'High':
-                    return `${type}-red-500`;
-                case 'Medium':
-                    return `${type}-warning`;
-                case 'Low':
-                    return `${type}-info`;
-                default:
-                    return `${type}-gray-400`;
-            }
-        }
-        
-        /**
-         * Lấy màu sắc Tailwind cho tình trạng công việc
-         */
-        function getStatusColor(status) {
-            switch (status) {
-                case 'Completed':
-                    return 'bg-secondary'; // Xanh lá
-                case 'In Progress':
-                    return 'bg-blue-500'; // Xanh dương
-                case 'Pending':
-                    return 'bg-red-400'; // Đỏ nhạt
-                default:
-                    return 'bg-gray-400';
-            }
+        function closeLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('errorMessage').style.display = 'none';
         }
 
-        /**
-         * Kiểm tra xem công việc có bị quá hạn không
-         */
-        function isOverdue(deadlineDate) {
-            if (!deadlineDate) return false;
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const deadline = new Date(deadlineDate);
-            // Đặt múi giờ cho deadline để so sánh chính xác với today
-            deadline.setHours(0, 0, 0, 0); 
-            return deadline.getTime() < today.getTime();
-        }
-        
-        // Hàm tính khoảng cách ngày (đã làm tròn)
-        function dateDiffInDays(date1, date2) {
-            const ONE_DAY = 1000 * 60 * 60 * 24;
-            // Tính toán sự khác biệt giữa hai ngày và làm tròn lên
-            const diffTime = new Date(date2).getTime() - new Date(date1).getTime();
-            return Math.ceil(diffTime / ONE_DAY);
-        }
-
-        // Đặt giá trị mặc định cho Ngày bắt đầu
-        dateStartInput.value = getTodayDateString();
-        // -----------------------------------------------------------
-
-
-        // Xử lý sự kiện khi chọn chế độ Hạn chót
-        deadlineModeSelect.addEventListener('change', () => {
-            if (deadlineModeSelect.value === 'specific') {
-                dateDeadlineInput.classList.remove('hidden');
-                dateDeadlineInput.value = calculateFutureDate(1); 
+        function attemptLogin() {
+            const password = document.getElementById('passwordInput').value;
+            const errorMsg = document.getElementById('errorMessage');
+            
+            if (password === ADMIN_PASSWORD) {
+                isLoggedIn = true;
+                closeLoginModal();
+                updateUIForLoginState();
+                showStatus('Đăng nhập thành công! Chào mừng Admin.', 'success');
             } else {
-                dateDeadlineInput.classList.add('hidden');
-                dateDeadlineInput.value = ''; 
+                errorMsg.style.display = 'block';
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
             }
+        }
+
+        function logout() {
+            isLoggedIn = false;
+            updateUIForLoginState();
+            // Switch back to search tab
+            switchTab('search');
+            showStatus('Đã đăng xuất khỏi chế độ Admin.', 'error');
+        }
+
+        function updateUIForLoginState() {
+            const loginBtn = document.getElementById('loginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const importTabBtn = document.getElementById('importTabBtn');
+            const tabContainer = document.getElementById('tabContainer');
+            const searchTabBtn = document.getElementById('searchTabBtn');
+            
+            if (isLoggedIn) {
+                // Show admin controls
+                loginBtn.style.display = 'none';
+                logoutBtn.style.display = 'block';
+                importTabBtn.style.display = 'block';
+                tabContainer.classList.remove('not-logged-in');
+                
+                // Show tab text
+                searchTabBtn.style.color = '';
+                importTabBtn.style.color = '';
+            } else {
+                // Hide admin controls
+                loginBtn.style.display = 'block';
+                logoutBtn.style.display = 'none';
+                importTabBtn.style.display = 'none';
+                tabContainer.classList.add('not-logged-in');
+                
+                // Hide tab text
+                searchTabBtn.style.color = 'transparent';
+            }
+        }
+
+        // Enhanced tab switching with login check
+        function switchTab(tabName) {
+            // Check if trying to access import tab without login
+            if (tabName === 'import' && !isLoggedIn) {
+                openLoginModal();
+                return;
+            }
+            
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // Update active button
+            if (tabName === 'search') {
+                document.getElementById('searchTabBtn').classList.add('active');
+            } else if (tabName === 'import') {
+                document.getElementById('importTabBtn').classList.add('active');
+            }
+        }
+
+        // Password input enter key support
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    attemptLogin();
+                }
+            });
+            
+            // Close modal when clicking outside
+            document.getElementById('loginModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeLoginModal();
+                }
+            });
+            
+            // Initialize UI state
+            updateUIForLoginState();
         });
 
-
-        // Hàm xử lý lỗi chung
-        function displayError(message) {
-            console.error(message);
-            errorMessage.textContent = `Lỗi: ${message}. Vui lòng thử lại.`;
-            errorMessage.classList.remove('hidden');
-            loadingIndicator.classList.add('hidden');
-        }
-
-
-        // --- 2. HÀM THAO TÁC VỚI LOCALSTORAGE & RENDER GIAO DIỆN ---
-
-        /**
-         * Render danh sách công việc từ dữ liệu hiện tại
-         */
-        function renderTasks(todos) {
-            taskList.innerHTML = '';
-            loadingIndicator.classList.add('hidden');
-            
-            if (todos.length === 0) {
-                taskList.innerHTML = '<p class="text-center text-gray-500 py-6 border-2 border-dashed border-gray-200 rounded-lg">Không có công việc nào. Hãy thêm một công việc mới!</p>';
-                return;
-            }
-
-            // Sắp xếp dữ liệu theo thời gian tạo (từ mới nhất đến cũ nhất)
-            // Trong LocalStorage, chúng ta dùng `createdAt` là timestamp (số)
-            todos.sort((a, b) => b.createdAt - a.createdAt);
-
-            todos.forEach(task => {
-                const isCompleted = task.status === 'Completed';
-                const priorityColorClass = getPriorityColor(task.priority);
-                const statusColorClass = getStatusColor(task.status);
-                const isOverdueFlag = isOverdue(task.deadlineDate) && !isCompleted;
-
-                const li = document.createElement('li');
-                li.className = `task-card flex flex-col p-4 ${isCompleted ? 'status-completed bg-green-50 border-secondary/50' : 'bg-white border-gray-100 hover:bg-gray-50'} rounded-xl border-l-4 ${isOverdueFlag ? 'border-l-danger' : isCompleted ? 'border-l-secondary' : 'border-l-' + priorityColorClass.split('-')[1] + '-500'}`;
-                li.dataset.id = task.id;
-
-                li.innerHTML = `
-                    <!-- HEADER: Title, Priority, Toggle - Gọn hơn -->
-                    <div class="flex justify-between items-center mb-2">
-                        <div class="flex items-center min-w-0 pr-2 sm:pr-4">
-                            <!-- Status Dot/Icon -->
-                            <span class="w-3 h-3 rounded-full ${statusColorClass} mr-3 flex-shrink-0"></span>
-                            
-                            <span class="task-title text-lg font-bold text-gray-800 truncate block">${task.title}</span>
-                        </div>
-                        
-                        <div class="flex items-center space-x-2 flex-shrink-0">
-                            <!-- Priority Label (Desktop only) -->
-                            <span class="text-xs font-semibold uppercase text-white px-2 py-0.5 rounded-full ${priorityColorClass} shadow-md hidden sm:inline">
-                                ${task.priority.replace('Low', 'Thấp').replace('Medium', 'Trung bình').replace('High', 'Cao')}
-                            </span>
-                            
-                            <!-- Toggle Button -->
-                            <button class="toggle-details-btn text-gray-400 hover:text-primary transition duration-150" data-id="${task.id}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Collapsible Details Area (Ẩn mặc định) -->
-                    <div id="details-${task.id}" class="task-details-content space-y-3 pt-3 border-t border-gray-100 hidden">
-                        <!-- Description -->
-                        ${task.description ? `
-                            <div>
-                                <span class="block text-xs font-semibold text-gray-500 mb-1">Mô tả:</span>
-                                <p class="text-sm text-gray-700 whitespace-pre-wrap">${task.description}</p>
-                            </div>
-                        ` : '<p class="text-xs text-gray-400">Không có mô tả chi tiết.</p>'}
-
-                        <!-- Dates and Priority Detail -->
-                        <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                            <!-- Priority (Mobile/Detail View) -->
-                            <div class="flex items-center space-x-2 sm:hidden">
-                                <span class="font-medium">Ưu tiên:</span>
-                                <span class="font-bold text-${priorityColorClass.split('-')[1]}-700">
-                                    ${task.priority.replace('Low', 'Thấp').replace('Medium', 'Trung bình').replace('High', 'Cao')}
-                                </span>
-                            </div>
-                            
-                            <!-- Start Date -->
-                            <div class="flex items-center space-x-2 text-right justify-start col-span-1 ${task.startDate ? '' : 'hidden'}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span>BĐ: ${task.startDate || 'N/A'}</span>
-                            </div>
-                            
-                            <!-- Deadline Date -->
-                            <div class="flex items-center space-x-2 text-right justify-end col-span-1 ${task.deadlineDate ? '' : 'hidden'}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span class="${isOverdueFlag ? 'font-bold text-danger' : 'font-medium'}">Hạn chót: ${task.deadlineDate || 'N/A'}</span>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <!-- ACTIONS: Toggle & Delete (moved to bottom of card for consistency) -->
-                    <div class="flex justify-end space-x-3 border-t pt-3 mt-3">
-                        <button class="toggle-btn bg-info hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg text-sm shadow-md transition duration-200"
-                            data-id="${task.id}" data-current-status="${task.status}">
-                            ${isCompleted ? 'Chuyển sang Đang làm' : 'Hoàn thành'}
-                        </button>
-                        <button class="delete-btn bg-danger hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm shadow-md transition duration-200"
-                            data-id="${task.id}">
-                            Xóa
-                        </button>
-                    </div>
-                `;
-
-                taskList.appendChild(li);
+        // Original tab switching (keeping for compatibility)
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
             });
-            
-            // Gắn sự kiện sau khi render xong
-            attachTaskEventListeners();
-        }
-        
-        /**
-         * Lấy ngày min/max từ các công việc hợp lệ (có start và deadline)
-         */
-        function getMinMaxDates(todos) {
-            const validTasks = todos.filter(t => t.startDate && t.deadlineDate);
-            if (validTasks.length === 0) return { min: null, max: null, rangeDays: 0 };
-
-            let minDate = new Date(validTasks[0].startDate);
-            let maxDate = new Date(validTasks[0].deadlineDate);
-
-            validTasks.forEach(task => {
-                const start = new Date(task.startDate);
-                const end = new Date(task.deadlineDate);
-
-                if (start.getTime() < minDate.getTime()) minDate = start;
-                if (end.getTime() > maxDate.getTime()) maxDate = end;
-            });
-            
-            // Đặt thời gian về 00:00:00 cho cả hai ngày
-            minDate.setHours(0, 0, 0, 0);
-            maxDate.setHours(0, 0, 0, 0); 
-            
-            // Thêm 1 ngày vào maxDate để bao gồm ngày cuối cùng
-            maxDate.setDate(maxDate.getDate() + 1);
-
-            const rangeDays = dateDiffInDays(minDate, maxDate);
-            
-            return { min: minDate, max: maxDate, rangeDays: rangeDays };
-        }
-        
-        /**
-         * Render Sơ đồ Gantt
-         */
-        function renderGanttChart(todos) {
-            ganttChartContent.innerHTML = '';
-            
-            const validTasks = todos.filter(t => t.startDate && t.deadlineDate);
-
-            if (validTasks.length === 0) {
-                ganttMessage.classList.remove('hidden');
-                return;
-            }
-            ganttMessage.classList.add('hidden');
-
-            const { min: minDate, rangeDays } = getMinMaxDates(validTasks);
-
-            if (rangeDays <= 0) {
-                ganttMessage.classList.remove('hidden');
-                ganttMessage.textContent = 'Không đủ dữ liệu ngày để vẽ biểu đồ Gantt.';
-                return;
-            }
-
-            // Chiều rộng tối thiểu là 800px hoặc lớn hơn nếu cần cho độ phân giải tốt
-            const chartWidth = Math.max(800, rangeDays * 50); 
-            
-            let html = `
-                <div style="width: ${chartWidth}px;" class="min-w-full">
-                    <!-- Date Headers (Timeline) -->
-                    <div id="gantt-headers" class="flex border-b border-gray-300 mb-4 bg-gray-50 sticky top-0 z-10 shadow-sm">
-            `;
-            
-            // Tạo các cột ngày (sẽ hiển thị tối đa 30 cột cho giao diện dễ nhìn, nếu quá dài thì chỉ hiển thị ngày quan trọng)
-            const headersToShow = Math.min(rangeDays, 30); 
-            const step = Math.ceil(rangeDays / headersToShow);
-            let totalHeaderWidth = 0;
-
-            for (let i = 0; i < rangeDays; i += step) {
-                const d = new Date(minDate);
-                d.setDate(minDate.getDate() + i);
-                
-                const day = String(d.getDate()).padStart(2, '0');
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                
-                const widthPercent = (step / rangeDays) * 100;
-                totalHeaderWidth += widthPercent;
-
-                html += `
-                    <div style="width: ${widthPercent}%; min-w: 50px;"
-                         class="text-xs font-semibold text-gray-700 text-center border-l border-gray-200 py-2 px-1 flex-shrink-0">
-                        ${day}/${month}
-                    </div>
-                `;
-            }
-            // Đảm bảo tổng chiều rộng là 100% nếu có sai số làm tròn
-            if (totalHeaderWidth < 100) {
-                 html += `<div style="width: ${100 - totalHeaderWidth}%;" class="border-l border-gray-200"></div>`;
-            }
-            
-            html += `</div> <!-- End Gantt Headers -->`;
-            
-            // Task Rows
-            validTasks.forEach(task => {
-                const start = new Date(task.startDate);
-                const end = new Date(task.deadlineDate);
-                start.setHours(0, 0, 0, 0);
-                end.setHours(0, 0, 0, 0);
-
-                // Độ lệch từ ngày bắt đầu nhỏ nhất (minDate) đến ngày bắt đầu của task
-                const startOffsetDays = dateDiffInDays(minDate, start);
-                
-                // Khoảng thời gian task kéo dài (bao gồm cả ngày bắt đầu và ngày kết thúc)
-                const durationDays = dateDiffInDays(start, end) + 1; 
-
-                const startOffsetPercent = (startOffsetDays / rangeDays) * 100;
-                const durationPercent = (durationDays / rangeDays) * 100;
-                
-                const isCompleted = task.status === 'Completed';
-                const isOverdueFlag = isOverdue(task.deadlineDate) && !isCompleted;
-
-                let barColor = getPriorityColor(task.priority);
-                
-                if (isCompleted) {
-                    barColor = 'bg-secondary';
-                } else if (isOverdueFlag) {
-                    barColor = 'bg-danger';
-                }
-
-                const opacityClass = isCompleted ? 'opacity-50' : 'opacity-90';
-
-                html += `
-                    <div class="flex items-center space-x-4 py-2 border-b border-gray-100">
-                        <div class="text-xs font-medium text-gray-800 w-1/4 min-w-[150px] truncate" title="${task.title}">${task.title}</div>
-                        <div class="relative flex-grow h-8 bg-gray-100 rounded-lg overflow-hidden">
-                            <div class="gantt-timeline-bar absolute top-0 left-0 h-full rounded-lg text-xs flex items-center justify-center p-1 font-semibold text-white ${barColor} ${opacityClass}"
-                                 style="margin-left: ${startOffsetPercent}%; width: ${durationPercent}%;"
-                                 title="${task.title} (${task.startDate} - ${task.deadlineDate})">
-                                 <span class="truncate px-1">${task.title}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
             });
 
-            ganttChartContent.innerHTML += html;
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
         }
 
+        // Analyze JSON structure to get dynamic fields
+        function analyzeDataStructure(data) {
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                return {};
+            }
 
-        /**
-         * Tính toán và hiển thị thống kê
-         */
-        function calculateAndRenderStats(todos) {
-            const stats = {
-                total: todos.length,
-                completed: 0,
-                pending: 0, 
-                overdue: 0,
-                priority: { High: 0, Medium: 0, Low: 0 }
-            };
-
-            todos.forEach(task => {
-                if (task.status === 'Completed') {
-                    stats.completed++;
-                } else {
-                    stats.pending++;
-                }
-
-                if (isOverdue(task.deadlineDate) && task.status !== 'Completed') {
-                    stats.overdue++;
-                }
-
-                if (task.priority in stats.priority) {
-                    stats.priority[task.priority]++;
+            const structure = {};
+            const firstItem = data[0];
+            
+            // Get all fields from first item
+            Object.keys(firstItem).forEach(key => {
+                if (key !== 'id') { // Skip ID field
+                    const value = firstItem[key];
+                    structure[key] = {
+                        type: Array.isArray(value) ? 'array' : typeof value,
+                        displayName: formatFieldName(key),
+                        searchable: true
+                    };
                 }
             });
-            
-            // Hiển thị ra DOM
-            statsTotal.textContent = stats.total;
-            statsCompleted.textContent = stats.completed;
-            statsActive.textContent = stats.pending; 
-            statsOverdue.textContent = stats.overdue;
-            statsHigh.textContent = stats.priority.High;
-            statsMedium.textContent = stats.priority.Medium;
-            statsLow.textContent = stats.priority.Low;
+
+            return structure;
         }
 
-        /**
-         * Gắn các event listener cho các nút Toggle, Delete, và Toggle Details
-         */
-        function attachTaskEventListeners() {
-            // Event cho nút Hoàn thành/Đang làm
-            document.querySelectorAll('.toggle-btn').forEach(button => {
-                button.onclick = (e) => {
-                    e.stopPropagation(); 
-                    const id = button.dataset.id;
-                    const currentStatus = button.dataset.currentStatus;
-                    
-                    let newStatus;
-                    if (currentStatus === 'Completed') {
-                        newStatus = 'Pending'; // Chuyển sang Pending khi bỏ hoàn thành
-                    } else {
-                        newStatus = 'Completed';
+        // Format field names for display - sử dụng tên trường gốc
+        function formatFieldName(fieldName) {
+            // Không dùng mapping nữa, trả về tên trường gốc
+            // Chỉ format chữ cái đầu thành hoa
+            return fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
+        }
+
+        // Get searchable value from field
+        function getSearchableValue(item, fieldName) {
+            const value = item[fieldName];
+            if (Array.isArray(value)) {
+                return value.join(' ').toLowerCase();
+            }
+            return String(value || '').toLowerCase();
+        }
+
+        // Load dữ liệu từ file JSON
+        async function loadData() {
+            try {
+                const response = await fetch('data.json');
+                const data = await response.json();
+                dictionaryData = data.dictionary;
+                
+                // Analyze structure after loading data
+                dataStructure = analyzeDataStructure(dictionaryData);
+                console.log('Data structure detected:', dataStructure);
+                
+                // Hiển thị toàn bộ dữ liệu khi vừa load xong
+                displayAllData();
+                
+            } catch (error) {
+                console.error('Lỗi load dữ liệu:', error);
+                // Fallback data nếu không load được file JSON
+                dictionaryData = [
+                    {
+                        id: 1,
+                        word: "JavaScript",
+                        category: "Ngôn ngữ lập trình",
+                        description: "Ngôn ngữ lập trình thông dịch, hướng đối tượng với các hàm hạng nhất",
+                        details: "JavaScript là ngôn ngữ lập trình được sử dụng rộng rãi để phát triển web",
+                        tags: ["frontend", "backend", "web", "programming"]
                     }
-                    updateTaskStatus(id, newStatus);
-                };
-            });
-
-            // Event cho nút Xóa
-            document.querySelectorAll('.delete-btn').forEach(button => {
-                button.onclick = (e) => {
-                    e.stopPropagation(); 
-                    const id = button.dataset.id;
-                    deleteTask(id);
-                };
-            });
-            
-            // Event cho nút Toggle Details
-            document.querySelectorAll('.toggle-details-btn').forEach(button => {
-                button.onclick = (e) => {
-                    e.stopPropagation(); 
-                    const id = button.dataset.id;
-                    const detailsElement = document.getElementById(`details-${id}`);
-                    
-                    detailsElement.classList.toggle('hidden');
-                    button.querySelector('svg').classList.toggle('rotate-180');
-                };
-            });
+                ];
+                dataStructure = analyzeDataStructure(dictionaryData);
+                displayAllData();
+            }
         }
 
-
-        /**
-         * Thêm công việc mới vào mảng và lưu vào LocalStorage
-         */
-        function addTask(title, description, priority, startDate, deadlineDate) {
-            const newTask = {
-                id: Date.now(), // Sử dụng timestamp làm ID duy nhất
-                title: title.trim(),
-                description: description.trim() || null, 
-                status: 'Pending', 
-                priority: priority,
-                startDate: startDate || null,
-                deadlineDate: deadlineDate || null,
-                createdAt: Date.now() // Timestamp tạo
+        // Debounce function để tránh gọi quá nhiều lần
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
             };
-
-            currentTodos.push(newTask);
-            saveTasks();
-            
-            // Xóa input sau khi thêm thành công và đặt lại form
-            titleInput.value = ''; 
-            descriptionInput.value = '';
-            prioritySelect.value = 'Medium';
-            dateStartInput.value = getTodayDateString(); 
-            deadlineModeSelect.value = 'none'; 
-            dateDeadlineInput.value = ''; 
-            dateDeadlineInput.classList.add('hidden'); 
         }
 
-        /**
-         * Cập nhật trạng thái công việc
-         */
-        function updateTaskStatus(id, newStatus) {
-            const taskIndex = currentTodos.findIndex(task => task.id == id);
-            if (taskIndex !== -1) {
-                currentTodos[taskIndex].status = newStatus;
-                saveTasks();
+        // Highlight matching text
+        function highlightText(text, searchTerm) {
+            if (!searchTerm) return text;
+            const regex = new RegExp(`(${searchTerm})`, 'gi');
+            return text.replace(regex, '<span class="highlight">$1</span>');
+        }
+
+        // Tìm kiếm và hiển thị gợi ý
+        function showSuggestions(searchTerm) {
+            const dropdown = document.getElementById('suggestionsDropdown');
+            
+            if (!searchTerm || searchTerm.trim().length < 1) {
+                dropdown.style.display = 'none';
+                return;
             }
-        }
 
-        /**
-         * Xóa công việc khỏi mảng và lưu vào LocalStorage
-         */
-        function deleteTask(id) {
-            currentTodos = currentTodos.filter(task => task.id != id);
-            saveTasks();
-        }
-
-
-        // --- 3. XỬ LÝ SỰ KIỆN GIAO DIỆN ---
-
-        // Xử lý sự kiện gửi form để thêm công việc
-        addTaskForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const title = titleInput.value;
-            const description = descriptionInput.value;
-            const priority = prioritySelect.value;
-            const startDate = dateStartInput.value;
-            
-            let deadlineDate = null;
-            const deadlineMode = deadlineModeSelect.value;
-
-            if (deadlineMode === 'specific') {
-                deadlineDate = dateDeadlineInput.value;
-            } else if (deadlineMode === 'today') {
-                deadlineDate = getTodayDateString();
-            } else if (parseInt(deadlineMode, 10) > 0) {
-                deadlineDate = calculateFutureDate(deadlineMode);
-            } 
-            
-            if (title) {
-                addTask(title, description, priority, startDate, deadlineDate);
+            // Kiểm tra dữ liệu đã tải chưa
+            if (!dictionaryData || !Array.isArray(dictionaryData) || dictionaryData.length === 0) {
+                dropdown.style.display = 'none';
+                return;
             }
+
+            const searchLower = searchTerm.toLowerCase().trim();
+            
+            // Tìm kiếm với độ ưu tiên: Mã HP > Tên tiếng Việt > Tên tiếng Anh > Các trường khác
+            const results = dictionaryData.filter(item => {
+                const maHP = getSearchableValue(item, 'Mã HP');
+                const tenViet = getSearchableValue(item, 'Tên tiếng Việt');
+                const tenAnh = getSearchableValue(item, 'Tên tiếng Anh');
+                
+                // Ưu tiên tìm kiếm trong các trường chính
+                return maHP.includes(searchLower) || 
+                       tenViet.includes(searchLower) || 
+                       tenAnh.includes(searchLower) ||
+                       // Tìm kiếm trong các trường khác
+                       Object.keys(dataStructure).some(fieldName => {
+                           if (['Mã HP', 'Tên tiếng Việt', 'Tên tiếng Anh'].includes(fieldName)) return false;
+                           const searchableValue = getSearchableValue(item, fieldName);
+                           return searchableValue.includes(searchLower);
+                       });
+            })
+            // Sắp xếp kết quả theo độ ưu tiên
+            .sort((a, b) => {
+                const aCode = getSearchableValue(a, 'Mã HP');
+                const bCode = getSearchableValue(b, 'Mã HP');
+                const aViet = getSearchableValue(a, 'Tên tiếng Việt');
+                const bViet = getSearchableValue(b, 'Tên tiếng Việt');
+                
+                // Ưu tiên mã HP khớp chính xác
+                if (aCode === searchLower && bCode !== searchLower) return -1;
+                if (bCode === searchLower && aCode !== searchLower) return 1;
+                
+                // Ưu tiên mã HP bắt đầu bằng search term
+                if (aCode.startsWith(searchLower) && !bCode.startsWith(searchLower)) return -1;
+                if (bCode.startsWith(searchLower) && !aCode.startsWith(searchLower)) return 1;
+                
+                // Ưu tiên tên tiếng Việt bắt đầu bằng search term
+                if (aViet.startsWith(searchLower) && !bViet.startsWith(searchLower)) return -1;
+                if (bViet.startsWith(searchLower) && !aViet.startsWith(searchLower)) return 1;
+                
+                return 0;
+            })
+            .slice(0, 8); // Giới hạn 8 kết quả
+
+            if (results.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            dropdown.innerHTML = results.map((item, index) => {
+                const maHP = item['Mã HP'] || '';
+                const tenViet = item['Tên tiếng Việt'] || '';
+                const tenAnh = item['Tên tiếng Anh'] || '';
+                const donVi = item['Đơn vị quản lý học phần'] || '';
+                const soTC = item['Số TC'] || '';
+                
+                // Xác định trường nào khớp với search term để highlight
+                let primaryText = '';
+                let matchedField = '';
+                
+                if (getSearchableValue(item, 'Mã HP').includes(searchLower)) {
+                    primaryText = maHP;
+                    matchedField = 'Mã HP';
+                } else if (getSearchableValue(item, 'Tên tiếng Việt').includes(searchLower)) {
+                    primaryText = tenViet;
+                    matchedField = 'Tên tiếng Việt';
+                } else if (getSearchableValue(item, 'Tên tiếng Anh').includes(searchLower)) {
+                    primaryText = tenAnh;
+                    matchedField = 'Tên tiếng Anh';
+                } else {
+                    primaryText = tenViet || maHP;
+                    matchedField = 'Tên tiếng Việt';
+                }
+                
+                return `
+                    <div class="suggestion-item" data-index="${index}" data-word="${primaryText}" data-item-id="${item.id}">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <span class="suggestion-word">${highlightText(String(primaryText), searchTerm)}</span>
+                                <span class="suggestion-category">${maHP}</span>
+                                ${soTC ? `<span style="background: #ff9800; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 5px;">${soTC} TC</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="suggestion-description">
+                            ${matchedField !== 'Tên tiếng Việt' && tenViet ? `<div style="font-size: 11px; color: #555; margin-top: 2px;">${highlightText(tenViet, searchTerm)}</div>` : ''}
+                            ${matchedField !== 'Tên tiếng Anh' && tenAnh ? `<div style="font-size: 10px; color: #777; font-style: italic; margin-top: 1px;">${highlightText(tenAnh, searchTerm)}</div>` : ''}
+                            ${donVi ? `<div style="font-size: 9px; color: #999; margin-top: 2px; cursor: pointer;" onclick="event.stopPropagation(); searchByDepartment('${donVi}')" onmouseover="this.style.color='#007bff'" onmouseout="this.style.color='#999'" title="Click để xem tất cả học phần của đơn vị này">📁 ${donVi}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            dropdown.style.display = 'block';
+            currentHighlightIndex = -1;
+        }
+
+        // Thực hiện tìm kiếm và hiển thị kết quả chi tiết
+        function performSearch(searchTerm = null, isExactMatch = false, selectedItemId = null) {
+            const term = searchTerm || document.getElementById('searchInput').value.toLowerCase().trim();
+            const resultsContainer = document.getElementById('resultsContainer');
+
+            // Nếu không có search term, hiển thị toàn bộ dữ liệu
+            if (!term) {
+                displayAllData();
+                return;
+            }
+
+            let results = [];
+
+            if (isExactMatch && selectedItemId) {
+                // Nếu là exact match từ suggestion, chỉ hiển thị item được chọn
+                results = dictionaryData.filter(item => item.id === selectedItemId);
+            } else {
+                // Tìm kiếm thông thường
+                results = dictionaryData.filter(item => {
+                    const searchLower = term.toLowerCase();
+                    
+                    // Tìm kiếm trong tất cả các trường
+                    return Object.keys(dataStructure).some(fieldName => {
+                        const searchableValue = getSearchableValue(item, fieldName);
+                        return searchableValue.includes(searchLower);
+                    });
+                });
+            }
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">Không tìm thấy kết quả nào phù hợp</div>';
+            } else {
+                resultsContainer.innerHTML = results.map(item => {
+                    const fields = Object.keys(dataStructure);
+                    let resultHTML = '<div class="result-item">';
+                    
+                    // Hiển thị trường đầu tiên làm title
+                    const primaryField = fields[0];
+                    const primaryValue = item[primaryField];
+                    const secondaryField = fields[1];
+                    const secondaryValue = item[secondaryField];
+                    
+                    resultHTML += `<div class="result-title">${highlightText(String(primaryValue), term)}`;
+                    if (secondaryValue && secondaryField !== primaryField) {
+                        resultHTML += ` <span style="font-size: 12px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
+                    }
+                    resultHTML += `</div>`;
+                    
+                    // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
+                    if (item["Đơn vị quản lý học phần"]) {
+                        resultHTML += `<div style="margin-top: 8px;">`;
+                        resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                        resultHTML += `</div>`;
+                    }
+                    
+                    // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                    fields.slice(2).forEach(fieldName => {
+                        if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                        
+                        const value = item[fieldName];
+                        const fieldDisplay = dataStructure[fieldName].displayName;
+                        
+                        if (value) {
+                            if (Array.isArray(value)) {
+                                // Hiển thị array (tags)
+                                resultHTML += `<div style="margin-top: 8px;">`;
+                                resultHTML += `<span style="font-size: 11px; color: #888;">${fieldDisplay}: </span>`;
+                                resultHTML += value.map(tag => 
+                                    `<span style="background: #e3f2fd; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-right: 4px; color: #1976d2;">${highlightText(String(tag), term)}</span>`
+                                ).join('');
+                                resultHTML += `</div>`;
+                            } else {
+                                // Hiển thị text thường
+                                resultHTML += `<div class="result-description"><strong>${fieldDisplay}:</strong> ${highlightText(String(value), term)}</div>`;
+                            }
+                        }
+                    });
+                    
+                    resultHTML += '</div>';
+                    return resultHTML;
+                }).join('');
+            }
+
+            // Ẩn dropdown sau khi tìm kiếm
+            document.getElementById('suggestionsDropdown').style.display = 'none';
+        }
+
+        // Debounced search function - giảm delay để phản hồi nhanh hơn
+        const debouncedSearch = debounce(showSuggestions, 150);
+
+        // Hàm tìm kiếm theo đơn vị quản lý học phần
+        function searchByDepartment(departmentName) {
+            const results = dictionaryData.filter(item => {
+                const itemDepartment = item['Đơn vị quản lý học phần'] || '';
+                return itemDepartment === departmentName;
+            });
+
+            const resultsContainer = document.getElementById('resultsContainer');
+            const searchInput = document.getElementById('searchInput');
+            
+            // Cập nhật search input
+            searchInput.value = `Đơn vị: ${departmentName}`;
+            
+            // Ẩn dropdown suggestions
+            document.getElementById('suggestionsDropdown').style.display = 'none';
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">Không tìm thấy học phần nào của đơn vị này</div>';
+                return;
+            }
+
+            const totalItems = results.length;
+            
+            // Hiển thị header thông tin về đơn vị
+            let departmentHTML = `
+                <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; color: white;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 18px;">📁 ${departmentName}</h3>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng cộng: <strong>${totalItems}</strong> học phần</p>
+                </div>
+            `;
+
+            // Hiển thị từng học phần
+            departmentHTML += results.map(item => {
+                const fields = Object.keys(dataStructure);
+                let resultHTML = '<div class="result-item">';
+                
+                // Hiển thị trường đầu tiên làm title
+                const primaryField = fields[0];
+                const primaryValue = item[primaryField];
+                const secondaryField = fields[1];
+                const secondaryValue = item[secondaryField];
+                
+                resultHTML += `<div class="result-title">${String(primaryValue)}`;
+                if (secondaryValue && secondaryField !== primaryField) {
+                    resultHTML += ` <span style="font-size: 12px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
+                }
+                resultHTML += `</div>`;
+                
+                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
+                if (item["Đơn vị quản lý học phần"]) {
+                    resultHTML += `<div style="margin-top: 8px;">`;
+                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'" onmouseout="this.style.background='#28a745'">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                    resultHTML += `</div>`;
+                }
+                
+                // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                fields.slice(2).forEach(fieldName => {
+                    if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                    
+                    const value = item[fieldName];
+                    const fieldDisplay = dataStructure[fieldName].displayName;
+                    
+                    if (value) {
+                        if (Array.isArray(value)) {
+                            // Hiển thị array (tags)
+                            resultHTML += `<div style="margin-top: 8px;">`;
+                            resultHTML += `<span style="font-size: 11px; color: #888;">${fieldDisplay}: </span>`;
+                            resultHTML += value.map(tag => 
+                                `<span style="background: #e3f2fd; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-right: 4px; color: #1976d2;">${String(tag)}</span>`
+                            ).join('');
+                            resultHTML += `</div>`;
+                        } else {
+                            // Hiển thị text thường
+                            resultHTML += `<div class="result-description"><strong>${fieldDisplay}:</strong> ${String(value)}</div>`;
+                        }
+                    }
+                });
+                
+                resultHTML += '</div>';
+                return resultHTML;
+            }).join('');
+
+            resultsContainer.innerHTML = departmentHTML;
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+
+            const searchInput = document.getElementById('searchInput');
+            const dropdown = document.getElementById('suggestionsDropdown');
+
+            // Realtime search khi gõ
+            searchInput.addEventListener('input', function(e) {
+                const value = e.target.value;
+                if (value.trim() === '') {
+                    // Nếu search box trống, hiển thị toàn bộ dữ liệu
+                    displayAllData();
+                    dropdown.style.display = 'none';
+                } else if (dictionaryData && dictionaryData.length > 0) {
+                    // Chỉ hiển thị gợi ý khi dữ liệu đã được tải
+                    debouncedSearch(value);
+                } else {
+                    // Nếu dữ liệu chưa tải, ẩn dropdown
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            // Keyboard navigation
+            searchInput.addEventListener('keydown', function(e) {
+                const items = dropdown.querySelectorAll('.suggestion-item');
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    currentHighlightIndex = Math.min(currentHighlightIndex + 1, items.length - 1);
+                    updateHighlight(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    currentHighlightIndex = Math.max(currentHighlightIndex - 1, -1);
+                    updateHighlight(items);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (currentHighlightIndex >= 0 && items[currentHighlightIndex]) {
+                        const word = items[currentHighlightIndex].dataset.word;
+                        const itemId = parseInt(items[currentHighlightIndex].dataset.itemId);
+                        searchInput.value = word;
+                        dropdown.style.display = 'none';
+                        performSearch(word, true, itemId); // true = isExactMatch, itemId = selected item ID
+                    } else {
+                        // Nếu không có item nào được highlight, thực hiện tìm kiếm thông thường
+                        dropdown.style.display = 'none';
+                        performSearch();
+                    }
+                } else if (e.key === 'Escape') {
+                    dropdown.style.display = 'none';
+                    currentHighlightIndex = -1;
+                }
+            });
+
+            // Click on suggestion
+            dropdown.addEventListener('click', function(e) {
+                const item = e.target.closest('.suggestion-item');
+                if (item) {
+                    const word = item.dataset.word;
+                    const itemId = parseInt(item.dataset.itemId);
+                    searchInput.value = word;
+                    dropdown.style.display = 'none';
+                    performSearch(word, true, itemId); // true = isExactMatch, itemId = selected item ID
+                }
+            });
+
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.search-container')) {
+                    dropdown.style.display = 'none';
+                    currentHighlightIndex = -1;
+                }
+            });
         });
 
-        // Khởi tạo ứng dụng khi tải trang
-        (function initApp() {
-            currentTodos = loadTasks();
-            switchTab('manager'); // Đảm bảo tab quản lý được hiển thị đầu tiên
-            updateAppUI(); // Cập nhật lần đầu tiên
-        })();
+        function updateHighlight(items) {
+            items.forEach((item, index) => {
+                if (index === currentHighlightIndex) {
+                    item.classList.add('highlighted');
+                } else {
+                    item.classList.remove('highlighted');
+                }
+            });
+        }
 
+        // Hiển thị toàn bộ dữ liệu
+        function displayAllData() {
+            const resultsContainer = document.getElementById('resultsContainer');
+            
+            if (!dictionaryData || dictionaryData.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">Chưa có dữ liệu nào được tải</div>';
+                return;
+            }
+
+            const totalItems = dictionaryData.length;
+            
+            // Hiển thị header thông tin tổng quan
+            let allDataHTML = `
+                <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                    <h3 style="color: #2e7d32; margin: 0 0 5px 0;">📚 Toàn bộ danh sách học phần</h3>
+                    <p style="color: #666; margin: 0; font-size: 14px;">Tổng cộng: <strong>${totalItems}</strong> học phần từ các đơn vị</p>
+                </div>
+            `;
+
+            // Hiển thị từng item
+            allDataHTML += dictionaryData.map(item => {
+                const fields = Object.keys(dataStructure);
+                let resultHTML = '<div class="result-item">';
+                
+                // Hiển thị trường đầu tiên làm title
+                const primaryField = fields[0];
+                const primaryValue = item[primaryField];
+                const secondaryField = fields[1];
+                const secondaryValue = item[secondaryField];
+                
+                resultHTML += `<div class="result-title">${String(primaryValue)}`;
+                if (secondaryValue && secondaryField !== primaryField) {
+                    resultHTML += ` <span style="font-size: 12px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
+                }
+                resultHTML += `</div>`;
+                
+                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
+                if (item["Đơn vị quản lý học phần"]) {
+                    resultHTML += `<div style="margin-top: 8px;">`;
+                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                    resultHTML += `</div>`;
+                }
+                
+                // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                fields.slice(2).forEach(fieldName => {
+                    if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                    
+                    const value = item[fieldName];
+                    const fieldDisplay = dataStructure[fieldName].displayName;
+                    
+                    if (value) {
+                        if (Array.isArray(value)) {
+                            // Hiển thị array (tags)
+                            resultHTML += `<div style="margin-top: 8px;">`;
+                            resultHTML += `<span style="font-size: 11px; color: #888;">${fieldDisplay}: </span>`;
+                            resultHTML += value.map(tag => 
+                                `<span style="background: #e3f2fd; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-right: 4px; color: #1976d2;">${String(tag)}</span>`
+                            ).join('');
+                            resultHTML += `</div>`;
+                        } else {
+                            // Hiển thị text thường
+                            resultHTML += `<div class="result-description"><strong>${fieldDisplay}:</strong> ${String(value)}</div>`;
+                        }
+                    }
+                });
+                
+                resultHTML += '</div>';
+                return resultHTML;
+            }).join('');
+
+            resultsContainer.innerHTML = allDataHTML;
+        }
+
+        // Excel Import Functions
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processExcelFile(file);
+            }
+        }
+
+        function processExcelFile(file) {
+            if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                showStatus('File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.', 'error');
+                return;
+            }
+
+            showStatus('Đang đọc file Excel...', 'success');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    excelWorkbook = XLSX.read(data, { type: 'array' });
+                    
+                    if (excelWorkbook.SheetNames.length === 0) {
+                        showStatus('File Excel không có sheet nào!', 'error');
+                        return;
+                    }
+
+                    if (excelWorkbook.SheetNames.length === 1) {
+                        // Chỉ có 1 sheet, xử lý trực tiếp
+                        selectedSheetNames = [excelWorkbook.SheetNames[0]];
+                        processSelectedSheets();
+                    } else {
+                        // Có nhiều sheet, hiển thị để chọn
+                        displaySheetSelector();
+                    }
+
+                } catch (error) {
+                    console.error('Lỗi đọc file Excel:', error);
+                    showStatus('Lỗi đọc file Excel. Vui lòng kiểm tra format file.', 'error');
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function displaySheetSelector() {
+            const sheetSelector = document.getElementById('sheetSelector');
+            const sheetList = document.getElementById('sheetList');
+            
+            // Hide preview section if visible
+            document.getElementById('previewSection').style.display = 'none';
+            
+            // Reset selected sheets
+            selectedSheetNames = [];
+            updateSelectedCount();
+            
+            // Create sheet items with checkboxes
+            sheetList.innerHTML = excelWorkbook.SheetNames.map(sheetName => {
+                const sheet = excelWorkbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                const rowCount = jsonData.length;
+                const colCount = jsonData.length > 0 ? Math.max(...jsonData.map(row => row.length)) : 0;
+                
+                return `
+                    <div class="sheet-item" onclick="toggleSheet('${sheetName}')">
+                        <input type="checkbox" class="sheet-checkbox" id="checkbox_${sheetName}" onchange="toggleSheet('${sheetName}')">
+                        <div class="sheet-name">${sheetName}</div>
+                        <div class="sheet-info">${rowCount} dòng, ${colCount} cột</div>
+                    </div>
+                `;
+            }).join('');
+
+            sheetSelector.style.display = 'block';
+            showStatus(`Tìm thấy ${excelWorkbook.SheetNames.length} sheet. Chọn một hoặc nhiều sheet để import.`, 'success');
+        }
+
+        function toggleSheet(sheetName) {
+            const checkbox = document.getElementById(`checkbox_${sheetName}`);
+            const sheetItem = checkbox.closest('.sheet-item');
+            
+            if (selectedSheetNames.includes(sheetName)) {
+                // Remove from selection
+                selectedSheetNames = selectedSheetNames.filter(name => name !== sheetName);
+                checkbox.checked = false;
+                sheetItem.classList.remove('checked');
+            } else {
+                // Add to selection
+                selectedSheetNames.push(sheetName);
+                checkbox.checked = true;
+                sheetItem.classList.add('checked');
+            }
+            
+            updateSelectedCount();
+            document.getElementById('processSheetBtn').disabled = selectedSheetNames.length === 0;
+        }
+
+        function selectAllSheets() {
+            selectedSheetNames = [...excelWorkbook.SheetNames];
+            excelWorkbook.SheetNames.forEach(sheetName => {
+                const checkbox = document.getElementById(`checkbox_${sheetName}`);
+                const sheetItem = checkbox.closest('.sheet-item');
+                checkbox.checked = true;
+                sheetItem.classList.add('checked');
+            });
+            updateSelectedCount();
+            document.getElementById('processSheetBtn').disabled = false;
+            showStatus('Đã chọn tất cả sheet', 'success');
+        }
+
+        function selectNoSheets() {
+            selectedSheetNames = [];
+            excelWorkbook.SheetNames.forEach(sheetName => {
+                const checkbox = document.getElementById(`checkbox_${sheetName}`);
+                const sheetItem = checkbox.closest('.sheet-item');
+                checkbox.checked = false;
+                sheetItem.classList.remove('checked');
+            });
+            updateSelectedCount();
+            document.getElementById('processSheetBtn').disabled = true;
+            showStatus('Đã bỏ chọn tất cả sheet', 'error');
+        }
+
+        function updateSelectedCount() {
+            const countElement = document.getElementById('selectedCount');
+            countElement.textContent = `(${selectedSheetNames.length} sheet đã chọn)`;
+        }
+
+        function processSelectedSheets() {
+            if (!selectedSheetNames.length || !excelWorkbook) {
+                showStatus('Vui lòng chọn ít nhất một sheet để xử lý!', 'error');
+                return;
+            }
+
+            showStatus(`Đang xử lý ${selectedSheetNames.length} sheet...`, 'success');
+            
+            // Merge data from all selected sheets
+            mergeMultipleSheets();
+        }
+
+        function mergeMultipleSheets() {
+            pendingImportData = [];
+            let totalValidRows = 0;
+            let totalInvalidRows = 0;
+            let globalId = 1;
+
+            selectedSheetNames.forEach(sheetName => {
+                const sheet = excelWorkbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                if (jsonData.length < 2) {
+                    showStatus(`Sheet "${sheetName}" được bỏ qua (không có đủ dữ liệu)`, 'error');
+                    return;
+                }
+
+                // Process each sheet's data
+                const { validRows, invalidRows, sheetData } = processSheetData(jsonData, sheetName, globalId);
+                
+                // Merge into pending data
+                pendingImportData = pendingImportData.concat(sheetData);
+                
+                totalValidRows += validRows;
+                totalInvalidRows += invalidRows;
+                globalId += sheetData.length;
+            });
+
+            if (pendingImportData.length === 0) {
+                showStatus('Không có dữ liệu hợp lệ trong các sheet đã chọn!', 'error');
+                return;
+            }
+
+            // Hide sheet selector
+            document.getElementById('sheetSelector').style.display = 'none';
+
+            showStatus(`Đã gộp ${selectedSheetNames.length} sheet: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua`, 'success');
+            displayPreview();
+        }
+
+        function processSheetData(rawData, sheetName, startId) {
+            // Get header row (row 0) - tên các cột từ Excel
+            const headerRow = rawData[0];
+            const dataRows = rawData.slice(1);
+            const sheetData = [];
+
+            if (!headerRow || headerRow.length === 0) {
+                return { validRows: 0, invalidRows: dataRows.length, sheetData: [] };
+            }
+
+            let validRows = 0;
+            let invalidRows = 0;
+
+            dataRows.forEach((row, index) => {
+                // Skip empty rows
+                if (!row || row.length === 0 || row.every(cell => !cell)) {
+                    invalidRows++;
+                    return;
+                }
+
+                // Tạo object với tên field = tên header từ Excel
+                const rowData = {
+                    id: startId + validRows,
+                    "Đơn vị quản lý học phần": sheetName
+                };
+
+                let hasValidData = false;
+                headerRow.forEach((header, colIndex) => {
+                    if (header && header.trim()) {
+                        const fieldName = String(header).trim();
+                        const cellValue = row[colIndex] ? String(row[colIndex]).trim() : '';
+                        
+                        // Xử lý đặc biệt cho field có thể là array (tags, keywords, etc.)
+                        if (fieldName.toLowerCase().includes('tag') || 
+                            fieldName.toLowerCase().includes('keyword') ||
+                            fieldName.toLowerCase().includes('từ khóa')) {
+                            rowData[fieldName] = cellValue ? cellValue.split(',').map(tag => tag.trim()) : [];
+                        } else {
+                            rowData[fieldName] = cellValue;
+                        }
+                        
+                        if (cellValue) hasValidData = true;
+                    }
+                });
+
+                if (hasValidData) {
+                    sheetData.push(rowData);
+                    validRows++;
+                } else {
+                    invalidRows++;
+                }
+            });
+
+            return { validRows, invalidRows, sheetData };
+        }
+
+        function processExcelData(rawData) {
+            // Get header row (row 0) - tên các cột từ Excel
+            const headerRow = rawData[0];
+            const dataRows = rawData.slice(1);
+            pendingImportData = [];
+
+            if (!headerRow || headerRow.length === 0) {
+                showStatus('File Excel phải có header row!', 'error');
+                return;
+            }
+
+            let validRows = 0;
+            let invalidRows = 0;
+
+            dataRows.forEach((row, index) => {
+                // Skip empty rows
+                if (!row || row.length === 0 || row.every(cell => !cell)) {
+                    invalidRows++;
+                    return;
+                }
+
+                // Tạo object với tên field = tên header từ Excel
+                const rowData = {
+                    id: Date.now() + index, // Temporary ID
+                    "Đơn vị quản lý học phần": selectedSheetName || "Sheet1" // Thêm tên sheet
+                };
+
+                let hasValidData = false;
+                headerRow.forEach((header, colIndex) => {
+                    if (header && header.trim()) {
+                        const fieldName = String(header).trim();
+                        const cellValue = row[colIndex] ? String(row[colIndex]).trim() : '';
+                        
+                        // Xử lý đặc biệt cho field có thể là array (tags, keywords, etc.)
+                        if (fieldName.toLowerCase().includes('tag') || 
+                            fieldName.toLowerCase().includes('keyword') ||
+                            fieldName.toLowerCase().includes('từ khóa')) {
+                            rowData[fieldName] = cellValue ? cellValue.split(',').map(tag => tag.trim()) : [];
+                        } else {
+                            rowData[fieldName] = cellValue;
+                        }
+                        
+                        if (cellValue) hasValidData = true;
+                    }
+                });
+
+                if (hasValidData) {
+                    pendingImportData.push(rowData);
+                    validRows++;
+                } else {
+                    invalidRows++;
+                }
+            });
+
+            if (pendingImportData.length === 0) {
+                showStatus('Không có dữ liệu hợp lệ trong file Excel!', 'error');
+                return;
+            }
+
+            showStatus(`Đã xử lý: ${validRows} dòng hợp lệ, ${invalidRows} dòng bỏ qua`, 'success');
+            displayPreview();
+        }
+
+        function displayPreview() {
+            const previewSection = document.getElementById('previewSection');
+            const tableHead = document.getElementById('previewTableHead');
+            const tableBody = document.getElementById('previewTableBody');
+
+            if (pendingImportData.length === 0) return;
+
+            // Tạo headers động từ fields trong data
+            const firstItem = pendingImportData[0];
+            const fields = Object.keys(firstItem).filter(key => key !== 'id');
+            
+            tableHead.innerHTML = `
+                <tr>
+                    ${fields.map(field => `<th>${field}</th>`).join('')}
+                </tr>
+            `;
+
+            // Show max 10 rows for preview
+            const previewData = pendingImportData.slice(0, 10);
+            
+            tableBody.innerHTML = previewData.map(item => {
+                return `
+                    <tr>
+                        ${fields.map(field => {
+                            const value = item[field];
+                            if (Array.isArray(value)) {
+                                // Hiển thị array như tags
+                                return `<td>${value.map(tag => `<span style="background: #f0f0f0; padding: 1px 6px; border-radius: 8px; font-size: 10px; margin-right: 3px;">${tag}</span>`).join('')}</td>`;
+                            } else {
+                                // Hiển thị text thường, truncate nếu quá dài
+                                const displayValue = String(value || '');
+                                const truncated = displayValue.length > 50 ? displayValue.substring(0, 50) + '...' : displayValue;
+                                return `<td>${truncated}</td>`;
+                            }
+                        }).join('')}
+                    </tr>
+                `;
+            }).join('');
+
+            if (pendingImportData.length > 10) {
+                tableBody.innerHTML += `<tr><td colspan="${fields.length}" style="text-align: center; font-style: italic; color: #666;">... và ${pendingImportData.length - 10} dòng khác</td></tr>`;
+            }
+
+            previewSection.style.display = 'block';
+        }
+
+        function generateJSON() {
+            if (pendingImportData.length === 0) {
+                showStatus('Không có dữ liệu để tạo JSON!', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Đang tạo file JSON...', 'success');
+
+                // Assign proper IDs to all items
+                pendingImportData.forEach((item, index) => {
+                    item.id = index + 1;
+                });
+
+                // Create new JSON file content
+                const newData = {
+                    dictionary: pendingImportData
+                };
+
+                // Create and download JSON file
+                const jsonString = JSON.stringify(newData, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'data.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showStatus(`Tạo thành công file data.json với ${pendingImportData.length} từ khóa. File đã được tải xuống!`, 'success');
+                
+                // Clear import data after 3 seconds
+                setTimeout(() => {
+                    cancelImport();
+                }, 3000);
+
+            } catch (error) {
+                console.error('Lỗi tạo JSON:', error);
+                showStatus('Có lỗi xảy ra khi tạo file JSON!', 'error');
+            }
+        }
+
+
+
+        function cancelImport() {
+            pendingImportData = [];
+            excelWorkbook = null;
+            selectedSheetNames = [];
+            
+            document.getElementById('previewSection').style.display = 'none';
+            document.getElementById('sheetSelector').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('processSheetBtn').disabled = true;
+            
+            // Clear sheet selection
+            document.querySelectorAll('.sheet-item').forEach(item => {
+                item.classList.remove('checked');
+            });
+            document.querySelectorAll('.sheet-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            updateSelectedCount();
+            showStatus('Đã hủy import', 'error');
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message status-${type}`;
+            statusDiv.style.display = 'block';
+
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Drag and Drop functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('uploadArea');
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight(e) {
+                uploadArea.classList.add('drag-over');
+            }
+
+            function unhighlight(e) {
+                uploadArea.classList.remove('drag-over');
+            }
+
+            uploadArea.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+
+                if (files.length > 0) {
+                    const file = files[0];
+                    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                        processExcelFile(file);
+                    } else {
+                        showStatus('Vui lòng chọn file Excel (.xlsx hoặc .xls)', 'error');
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html>
+
