@@ -1020,6 +1020,55 @@
         let selectedSheetNames = []; // Store multiple selected sheet names
         let isLoggedIn = false; // Authentication state
         const ADMIN_PASSWORD = "admin123"; // Change this to your desired password
+        let detectedSheetFieldName = null; // Trường được phát hiện tự động chứa thông tin sheet
+
+        // Function to auto-detect sheet field name
+        function detectSheetFieldName() {
+            if (!dictionaryData || dictionaryData.length === 0) {
+                detectedSheetFieldName = null;
+                return null;
+            }
+
+            // Lấy item đầu tiên để phân tích
+            const firstItem = dictionaryData[0];
+            const allFields = Object.keys(firstItem).filter(key => key !== 'id');
+            
+            // Tìm field có tên gợi ý về đơn vị/khoa/sheet
+            const possibleNames = [
+                'Đơn vị quản lý học phần', 'Khoa', 'Phòng ban', 'Bộ môn', 'Đơn vị', 
+                'Department', 'Faculty', 'Unit', 'Division', 'Sheet', 'Thằng chó con ngựa'
+            ];
+            
+            for (let fieldName of allFields) {
+                // Kiểm tra xem có phải field chứa thông tin đơn vị không
+                if (possibleNames.some(name => fieldName.toLowerCase().includes(name.toLowerCase()))) {
+                    detectedSheetFieldName = fieldName;
+                    return fieldName;
+                }
+            }
+            
+            // Nếu không tìm thấy dựa trên tên, thử tìm field có values giống tên sheet
+            // (để dự phòng cho trường hợp tên field được đặt tùy chỉnh)
+            for (let fieldName of allFields) {
+                const fieldValues = dictionaryData.map(item => item[fieldName]).filter(val => val);
+                const uniqueValues = [...new Set(fieldValues)];
+                
+                // Nếu field này có ít unique values và tất cả values đều là string ngắn
+                // thì có thể đây là field chứa thông tin sheet/đơn vị
+                if (uniqueValues.length <= 10 && uniqueValues.length > 0) {
+                    const allShortStrings = uniqueValues.every(val => 
+                        typeof val === 'string' && val.length < 100 && val.length > 0
+                    );
+                    if (allShortStrings) {
+                        detectedSheetFieldName = fieldName;
+                        return fieldName;
+                    }
+                }
+            }
+            
+            detectedSheetFieldName = null;
+            return null;
+        }
 
         // Authentication functions
         function openLoginModal() {
@@ -1198,6 +1247,10 @@
                 dataStructure = analyzeDataStructure(dictionaryData);
                 console.log('Data structure detected:', dataStructure);
                 
+                // Tự động phát hiện trường chứa thông tin sheet
+                const detectedField = detectSheetFieldName();
+                console.log('Sheet field detected:', detectedField);
+                
                 // Hiển thị toàn bộ dữ liệu khi vừa load xong
                 displayAllData();
                 
@@ -1305,7 +1358,7 @@
                 const maHP = item['Mã HP'] || '';
                 const tenViet = item['Tên tiếng Việt'] || '';
                 const tenAnh = item['Tên tiếng Anh'] || '';
-                const donVi = item['Đơn vị quản lý học phần'] || '';
+                const donVi = detectedSheetFieldName ? (item[detectedSheetFieldName] || '') : '';
                 const soTC = item['Số TC'] || '';
                 
                 // Xác định trường nào khớp với search term để highlight
@@ -1396,16 +1449,16 @@
                     }
                     resultHTML += `</div>`;
                     
-                    // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
-                    if (item["Đơn vị quản lý học phần"]) {
+                    // Hiển thị trường sheet (đơn vị quản lý) với styling đặc biệt và chức năng click
+                    if (detectedSheetFieldName && item[detectedSheetFieldName]) {
                         resultHTML += `<div style="margin-top: 8px;">`;
-                        resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                        resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item[detectedSheetFieldName]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${detectedSheetFieldName}: ${item[detectedSheetFieldName]}</span>`;
                         resultHTML += `</div>`;
                     }
                     
-                    // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                    // Hiển thị các trường khác (trừ primary, secondary và sheet field)
                     fields.slice(2).forEach(fieldName => {
-                        if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                        if (fieldName === detectedSheetFieldName) return; // Skip vì đã hiển thị ở trên
                         
                         const value = item[fieldName];
                         const fieldDisplay = dataStructure[fieldName].displayName;
@@ -1441,7 +1494,7 @@
         // Hàm tìm kiếm theo đơn vị quản lý học phần
         function searchByDepartment(departmentName) {
             const results = dictionaryData.filter(item => {
-                const itemDepartment = item['Đơn vị quản lý học phần'] || '';
+                const itemDepartment = detectedSheetFieldName ? (item[detectedSheetFieldName] || '') : '';
                 return itemDepartment === departmentName;
             });
 
@@ -1449,7 +1502,8 @@
             const searchInput = document.getElementById('searchInput');
             
             // Cập nhật search input
-            searchInput.value = `Đơn vị: ${departmentName}`;
+            const fieldLabel = detectedSheetFieldName || 'Đơn vị';
+            searchInput.value = `${fieldLabel}: ${departmentName}`;
             
             // Ẩn dropdown suggestions
             document.getElementById('suggestionsDropdown').style.display = 'none';
@@ -1486,16 +1540,16 @@
                 }
                 resultHTML += `</div>`;
                 
-                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
-                if (item["Đơn vị quản lý học phần"]) {
+                // Hiển thị trường sheet (đơn vị quản lý) với styling đặc biệt và chức năng click
+                if (detectedSheetFieldName && item[detectedSheetFieldName]) {
                     resultHTML += `<div style="margin-top: 8px;">`;
-                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'" onmouseout="this.style.background='#28a745'">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item[detectedSheetFieldName]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'" onmouseout="this.style.background='#28a745'">📁 ${detectedSheetFieldName}: ${item[detectedSheetFieldName]}</span>`;
                     resultHTML += `</div>`;
                 }
                 
-                // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                // Hiển thị các trường khác (trừ primary, secondary và sheet field)
                 fields.slice(2).forEach(fieldName => {
-                    if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                    if (fieldName === detectedSheetFieldName) return; // Skip vì đã hiển thị ở trên
                     
                     const value = item[fieldName];
                     const fieldDisplay = dataStructure[fieldName].displayName;
@@ -1644,16 +1698,16 @@
                 }
                 resultHTML += `</div>`;
                 
-                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
-                if (item["Đơn vị quản lý học phần"]) {
+                // Hiển thị trường sheet (đơn vị quản lý) với styling đặc biệt và chức năng click
+                if (detectedSheetFieldName && item[detectedSheetFieldName]) {
                     resultHTML += `<div style="margin-top: 8px;">`;
-                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item[detectedSheetFieldName]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${detectedSheetFieldName}: ${item[detectedSheetFieldName]}</span>`;
                     resultHTML += `</div>`;
                 }
                 
-                // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                // Hiển thị các trường khác (trừ primary, secondary và sheet field)
                 fields.slice(2).forEach(fieldName => {
-                    if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                    if (fieldName === detectedSheetFieldName) return; // Skip vì đã hiển thị ở trên
                     
                     const value = item[fieldName];
                     const fieldDisplay = dataStructure[fieldName].displayName;
