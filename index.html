@@ -331,6 +331,56 @@
             background-color: #45a049;
         }
 
+        /* Filter Section */
+        .filter-section {
+            margin: 15px 0 0 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        .filter-section h3 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .filter-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .field-filter-select {
+            flex: 1;
+            padding: 10px 15px;
+            font-size: 14px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+            color: #495057;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .field-filter-select:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .field-filter-select:hover {
+            border-color: #adb5bd;
+        }
+
+        .field-filter-select option {
+            padding: 8px;
+            background: white;
+            color: #495057;
+        }
+
         /* Dropdown gợi ý */
         .suggestions-dropdown {
             position: absolute;
@@ -889,6 +939,16 @@
                         <div id="suggestionsDropdown" class="suggestions-dropdown"></div>
                     </div>
                     <button onclick="performSearch()" class="search-button">Tìm Kiếm</button>
+                    
+                    <!-- Phần filter nhanh -->
+                    <div class="filter-section">
+                        <h3>🔻 Lọc Nhanh Theo Trường</h3>
+                        <div class="filter-container">
+                            <select id="fieldFilter" class="field-filter-select" onchange="applyFieldFilter()">
+                                <option value="">Mặc định</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Phần hiển thị kết quả -->
@@ -1068,6 +1128,161 @@
             
             detectedSheetFieldName = null;
             return null;
+        }
+
+        // Function to populate field filter dropdown
+        function populateFieldFilter() {
+            const filterSelect = document.getElementById('fieldFilter');
+            if (!dictionaryData || dictionaryData.length === 0) {
+                return;
+            }
+
+            // Lấy tất cả các trường có sẵn (trừ id)
+            const firstItem = dictionaryData[0];
+            const allFields = Object.keys(firstItem).filter(key => key !== 'id');
+            
+            // Xóa các options cũ (trừ option "Mặc định")
+            filterSelect.innerHTML = '<option value="">Mặc định</option>';
+            
+            // Thêm các trường vào dropdown
+            allFields.forEach(fieldName => {
+                // Lấy tất cả các giá trị unique của trường này
+                const fieldValues = dictionaryData.map(item => item[fieldName])
+                    .filter(val => val && val !== '')
+                    .map(val => String(val).trim());
+                
+                const uniqueValues = [...new Set(fieldValues)];
+                
+                // Chỉ thêm trường có ít hơn 20 unique values để tránh dropdown quá dài
+                if (uniqueValues.length > 0 && uniqueValues.length <= 20) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = `${fieldName} (${uniqueValues.length} giá trị)`;
+                    
+                    uniqueValues.sort().forEach(value => {
+                        const option = document.createElement('option');
+                        option.value = `${fieldName}:::${value}`;
+                        option.textContent = `${fieldName}: ${value}`;
+                        optgroup.appendChild(option);
+                    });
+                    
+                    filterSelect.appendChild(optgroup);
+                }
+            });
+        }
+
+        // Function to apply field filter
+        function applyFieldFilter() {
+            const filterSelect = document.getElementById('fieldFilter');
+            const selectedValue = filterSelect.value;
+            const resultsContainer = document.getElementById('resultsContainer');
+            const searchInput = document.getElementById('searchInput');
+
+            if (!selectedValue) {
+                // Nếu chọn "Mặc định", hiển thị toàn bộ dữ liệu
+                displayAllData();
+                searchInput.value = '';
+                return;
+            }
+
+            // Parse selected value: "fieldName:::fieldValue"
+            const [fieldName, fieldValue] = selectedValue.split(':::');
+            
+            // Filter dữ liệu theo trường và giá trị được chọn
+            const filteredResults = dictionaryData.filter(item => {
+                const itemValue = item[fieldName];
+                return itemValue && String(itemValue).trim() === fieldValue;
+            });
+
+            // Cập nhật search input để hiển thị filter hiện tại
+            searchInput.value = `${fieldName}: ${fieldValue}`;
+
+            // Hiển thị kết quả
+            displayFilteredResults(filteredResults, fieldName, fieldValue);
+        }
+
+        // Function to display filtered results
+        function displayFilteredResults(results, fieldName, fieldValue) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <h3>😔 Không tìm thấy kết quả</h3>
+                        <p>Không có học phần nào có <strong>${fieldName}</strong> là "<strong>${fieldValue}</strong>"</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const totalItems = results.length;
+            let filteredHTML = `
+                <div style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; color: white;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 18px;">🔍 ${fieldName}: ${fieldValue}</h3>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng cộng: <strong>${totalItems}</strong> học phần</p>
+                </div>
+            `;
+
+            // Hiển thị từng item
+            filteredHTML += results.map(item => {
+                const fields = Object.keys(dataStructure);
+                let resultHTML = '<div class="result-item">';
+                
+                // Hiển thị trường đầu tiên làm title
+                const primaryField = fields[0];
+                const primaryValue = item[primaryField];
+                const secondaryField = fields[1];
+                const secondaryValue = item[secondaryField];
+                
+                resultHTML += `<div class="result-title">${String(primaryValue)}`;
+                if (secondaryValue && secondaryField !== primaryField) {
+                    resultHTML += ` <span style="font-size: 12px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
+                }
+                resultHTML += `</div>`;
+                
+                // Hiển thị trường được filter với styling đặc biệt
+                if (item[fieldName]) {
+                    resultHTML += `<div style="margin-top: 8px;">`;
+                    resultHTML += `<span style="background: #007bff; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">🔍 ${fieldName}: ${item[fieldName]}</span>`;
+                    resultHTML += `</div>`;
+                }
+                
+                // Hiển thị trường sheet (đơn vị quản lý) nếu khác với trường đang filter
+                if (detectedSheetFieldName && item[detectedSheetFieldName] && fieldName !== detectedSheetFieldName) {
+                    resultHTML += `<div style="margin-top: 8px;">`;
+                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item[detectedSheetFieldName]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${detectedSheetFieldName}: ${item[detectedSheetFieldName]}</span>`;
+                    resultHTML += `</div>`;
+                }
+                
+                // Hiển thị các trường khác (trừ primary, secondary, filtered field và sheet field)
+                fields.slice(2).forEach(fieldDisplayName => {
+                    if (fieldDisplayName === detectedSheetFieldName || fieldDisplayName === fieldName) return; // Skip vì đã hiển thị ở trên
+                    
+                    const value = item[fieldDisplayName];
+                    const fieldDisplay = dataStructure[fieldDisplayName].displayName;
+                    
+                    if (value) {
+                        if (Array.isArray(value)) {
+                            // Hiển thị array (tags)
+                            resultHTML += `<div style="margin-top: 8px;">`;
+                            resultHTML += `<span style="font-size: 11px; color: #888;">${fieldDisplay}: </span>`;
+                            resultHTML += value.map(tag => 
+                                `<span style="background: #f0f0f0; padding: 1px 6px; border-radius: 8px; font-size: 10px; margin-right: 3px;">${tag}</span>`
+                            ).join('');
+                            resultHTML += `</div>`;
+                        } else {
+                            // Hiển thị text thường
+                            resultHTML += `<div style="margin-top: 5px; font-size: 12px;">`;
+                            resultHTML += `<span style="color: #666;">${fieldDisplay}:</span> ${String(value)}`;
+                            resultHTML += `</div>`;
+                        }
+                    }
+                });
+
+                resultHTML += '</div>';
+                return resultHTML;
+            }).join('');
+
+            resultsContainer.innerHTML = filteredHTML;
         }
 
         // Authentication functions
@@ -1251,6 +1466,9 @@
                 const detectedField = detectSheetFieldName();
                 console.log('Sheet field detected:', detectedField);
                 
+                // Populate filter dropdown với các trường có sẵn
+                populateFieldFilter();
+                
                 // Hiển thị toàn bộ dữ liệu khi vừa load xong
                 displayAllData();
                 
@@ -1268,6 +1486,7 @@
                     }
                 ];
                 dataStructure = analyzeDataStructure(dictionaryData);
+                populateFieldFilter();
                 displayAllData();
             }
         }
@@ -1405,6 +1624,9 @@
         function performSearch(searchTerm = null, isExactMatch = false, selectedItemId = null) {
             const term = searchTerm || document.getElementById('searchInput').value.toLowerCase().trim();
             const resultsContainer = document.getElementById('resultsContainer');
+            
+            // Reset field filter khi thực hiện search thông thường
+            document.getElementById('fieldFilter').value = '';
 
             // Nếu không có search term, hiển thị toàn bộ dữ liệu
             if (!term) {
